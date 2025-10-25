@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configs>
+  <append xpath="/items">
+    <item name="boombox">
+      <property name="Extends" value="meleeToolShovelT0StoneShovel" />
+      <property name="CreativeMode" value="Player" />
+      <property name="Group" value="Resources" />
+      <property name="DescriptionKey" value="boomboxDesc" />
+      <property name="CustomIcon" value="meleeToolShovelT0StoneShovel" />
+      <property name="DegradationPerUse" value="0" />
+      <property name="DegradationMax" value="0" />
+      <property class="Action0">
+        <property name="Class" value="Boombox.ItemActionBoomboxPlay, Boombox" />
+        <property name="Delay" value="0.25" />
+      </property>
+      <property class="Action1">
+        <property name="Class" value="Boombox.ItemActionBoomboxPlay, Boombox" />
+      </property>
+    </item>
+  </append>
+</configs>
+

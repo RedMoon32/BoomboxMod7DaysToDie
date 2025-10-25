@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>netstandard2.1</TargetFramework>
+    <AssemblyName>Boombox</AssemblyName>
+    <RootNamespace>Boombox</RootNamespace>
+    <LangVersion>9.0</LangVersion>
+    <Nullable>disable</Nullable>
+    <AllowUnsafeBlocks>false</AllowUnsafeBlocks>
+    <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="Assembly-CSharp" HintPath="..\..\..\7DaysToDie_Data\Managed\Assembly-CSharp.dll" />
+    <Reference Include="UnityEngine" HintPath="..\..\..\7DaysToDie_Data\Managed\UnityEngine.dll" />
+    <Reference Include="UnityEngine.CoreModule" HintPath="..\..\..\7DaysToDie_Data\Managed\UnityEngine.CoreModule.dll" />
+    <Reference Include="UnityEngine.AudioModule" HintPath="..\..\..\7DaysToDie_Data\Managed\UnityEngine.AudioModule.dll" />
+    <Reference Include="UnityEngine.UnityWebRequestAudioModule" HintPath="..\..\..\7DaysToDie_Data\Managed\UnityEngine.UnityWebRequestAudioModule.dll" />
+    <Reference Include="UnityEngine.UnityWebRequestModule" HintPath="..\..\..\7DaysToDie_Data\Managed\UnityEngine.UnityWebRequestModule.dll" />
+  </ItemGroup>
+</Project>

@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configs>
+  <append xpath="/recipes">
+    <recipe name="boombox" count="1" craft_time="2" always_unlocked="true">
+      <ingredient name="resourceWood" count="2" />
+    </recipe>
+  </append>
+</configs>
+

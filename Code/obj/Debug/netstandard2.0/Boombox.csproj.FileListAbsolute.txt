@@ -1,0 +1,5 @@
+C:\Program Files (x86)\Steam\steamapps\common\7 Days To Die\Mods\1_Boombox\Code\obj\Debug\netstandard2.0\Boombox.csproj.AssemblyReference.cache
+C:\Program Files (x86)\Steam\steamapps\common\7 Days To Die\Mods\1_Boombox\Code\obj\Debug\netstandard2.0\Boombox.GeneratedMSBuildEditorConfig.editorconfig
+C:\Program Files (x86)\Steam\steamapps\common\7 Days To Die\Mods\1_Boombox\Code\obj\Debug\netstandard2.0\Boombox.AssemblyInfoInputs.cache
+C:\Program Files (x86)\Steam\steamapps\common\7 Days To Die\Mods\1_Boombox\Code\obj\Debug\netstandard2.0\Boombox.AssemblyInfo.cs
+C:\Program Files (x86)\Steam\steamapps\common\7 Days To Die\Mods\1_Boombox\Code\obj\Debug\netstandard2.0\Boombox.csproj.CoreCompileInputs.cache
