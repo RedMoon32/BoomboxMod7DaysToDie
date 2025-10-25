@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configs>
+  <append xpath="/blocks">
+    <block name="boomboxBlock">
+      <property name="Extends" value="woodMaster" />
+      <property name="Class" value="Boombox.BlockBoombox, Boombox" />
+      <property name="CreativeMode" value="Player" />
+      <property name="DescriptionKey" value="boomboxDesc" />
+      <property name="Shape" value="Cube" />
+      <property name="IsDecoration" value="true" />
+      <property name="Place" value="TowardsPlacer" />
+      <property name="Collide" value="movement,melee,bullet,arrow,rocket" />
+      <property name="SoundPlace" value="woodblock_place" />
+      <property name="SoundPickup" value="woodblock_grab" />
+      <property name="Stacknumber" value="1" />
+      <property name="MaxDamage" value="400" />
+      <property name="DestroyItem" value="boombox" />
+    </block>
+  </append>
+</configs>

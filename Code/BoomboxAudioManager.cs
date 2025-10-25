@@ -9,24 +9,25 @@ namespace Boombox
 {
     public static class BoomboxAudioManager
     {
-        public const string DefaultMusicFolder = @"C:\\BoomboxMusic";
+        public const string DefaultMusicFolder = @"C:\BoomboxMusic";
+
+        private sealed class AudioContext
+        {
+            public GameObject Host;
+            public AudioSource Source;
+            public Coroutine Coroutine;
+            public string LastTrackPath = string.Empty;
+            public Vector3i? BlockPosition;
+
+            public bool IsValid => Host != null && Source != null;
+        }
 
         private static readonly System.Random Random = new System.Random();
-        private static readonly HashSet<string> SupportedExtensions = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
-        {
-            ".mp3",
-            ".ogg",
-            ".wav"
-        };
-
         private static readonly List<string> Tracks = new List<string>();
-
+        private static readonly Dictionary<Vector3i, AudioContext> WorldContexts = new Dictionary<Vector3i, AudioContext>();
+        private static EntityPlayerLocal _pendingPlacementPlayer;
+        private static AudioContext _playerContext;
         private static bool _initialized;
-        private static AudioSource _audioSource;
-        private static GameObject _audioObject;
-        private static Coroutine _currentCoroutine;
-        private static string _lastTrack = string.Empty;
-        private static bool _isLoading;
 
         public static void Initialize()
         {
@@ -39,7 +40,7 @@ namespace Boombox
             RefreshTrackList();
         }
 
-        public static void PlayRandomTrack(EntityPlayerLocal player)
+        public static void PlayNext(EntityPlayerLocal player)
         {
             if (player == null)
             {
@@ -47,78 +48,350 @@ namespace Boombox
             }
 
             Initialize();
-            EnsureAudioSource(player);
             RefreshTrackList();
 
-            if (_isLoading)
-            {
-                NotifyPlayer(player, "Boombox is loading audio, please wait...");
-                return;
-            }
-
-            if (Tracks.Count == 0)
+            var context = EnsurePlayerContext(player);
+            var trackPath = PickRandomTrack(context.LastTrackPath);
+            if (string.IsNullOrEmpty(trackPath))
             {
                 NotifyPlayer(player, $"No audio files found in {DefaultMusicFolder}. Supported: *.mp3, *.ogg, *.wav");
                 return;
             }
 
-            var trackPath = PickRandomTrack();
-            if (string.IsNullOrEmpty(trackPath))
-            {
-                NotifyPlayer(player, "Unable to select a track.");
-                return;
-            }
-
-            if (_audioSource.isPlaying)
-            {
-                _audioSource.Stop();
-            }
-
-            var manager = GameManager.Instance;
-            if (manager == null)
-            {
-                Debug.LogWarning("[Boombox] GameManager instance is unavailable; cannot play audio.");
-                return;
-            }
-
-            if (_currentCoroutine != null)
-            {
-                manager.StopCoroutine(_currentCoroutine);
-                _currentCoroutine = null;
-            }
-
-            _currentCoroutine = manager.StartCoroutine(PlayTrackCoroutine(player, trackPath));
+            StartPlayback(context, trackPath, player);
         }
 
-        private static void EnsureAudioSource(EntityPlayerLocal player)
+        public static void StopPlayer(EntityPlayerLocal player)
         {
-            if (_audioSource != null)
+            if (_playerContext == null)
             {
                 return;
             }
 
-            var holder = new GameObject("BoomboxAudioEmitter")
+            StopContext(_playerContext);
+            NotifyPlayer(player, "Boombox stopped.");
+        }
+
+        public static void OnBlockPlaced(EntityPlayerLocal player, Vector3i position)
+        {
+            Initialize();
+
+            Debug.Log($"[Boombox] OnBlockPlaced transfer check at {position} from {player?.EntityName ?? "unknown"}");
+            var worldContext = EnsureWorldContext(position);
+            worldContext.Host.transform.position = GetBlockCenter(position);
+
+            if (_playerContext != null && _playerContext.Source != null && _playerContext.Source.clip != null)
+            {
+                var clip = _playerContext.Source.clip;
+                var time = Mathf.Clamp(_playerContext.Source.time, 0f, clip.length);
+
+                worldContext.Source.clip = clip;
+                worldContext.Source.time = time;
+                worldContext.Source.volume = GetGameVolume();
+                worldContext.Source.Play();
+
+                worldContext.LastTrackPath = _playerContext.LastTrackPath;
+
+                StopContext(_playerContext);
+                NotifyPlayer(player, $"Transferred playback to placed boombox ({clip.name}).");
+            }
+            else
+            {
+                Debug.Log("[Boombox] No handheld audio to transfer; ensuring world source idle.");
+                StopContext(worldContext);
+            }
+        }
+
+        public static void OnBlockRemoved(Vector3i position)
+        {
+            Debug.Log($"[Boombox] OnBlockRemoved at {position}");
+            if (WorldContexts.TryGetValue(position, out var context))
+            {
+                StopContext(context);
+                DestroyContext(context);
+                WorldContexts.Remove(position);
+            }
+        }
+
+        internal static void BeginPlacement(EntityPlayerLocal player)
+        {
+            Debug.Log($"[Boombox] BeginPlacement by {player?.EntityName ?? "unknown"}");
+            _pendingPlacementPlayer = player;
+        }
+
+        internal static EntityPlayerLocal ConsumePendingPlacementPlayer()
+        {
+            var player = _pendingPlacementPlayer;
+            _pendingPlacementPlayer = null;
+            return player;
+        }
+
+        public static void OnBlockUnloaded(Vector3i position)
+        {
+            Debug.Log($"[Boombox] OnBlockUnloaded at {position}");
+            if (WorldContexts.TryGetValue(position, out var context))
+            {
+                StopContext(context);
+                DestroyContext(context);
+                WorldContexts.Remove(position);
+            }
+        }
+
+        public static void PlayNextAt(Vector3i position, EntityPlayerLocal player)
+        {
+            Initialize();
+            RefreshTrackList();
+
+            Debug.Log($"[Boombox] PlayNextAt {position}");
+            var context = EnsureWorldContext(position);
+            context.Host.transform.position = GetBlockCenter(position);
+
+            var trackPath = PickRandomTrack(context.LastTrackPath);
+            if (string.IsNullOrEmpty(trackPath))
+            {
+                NotifyPlayer(player, $"No audio files found in {DefaultMusicFolder}. Supported: *.mp3, *.ogg, *.wav");
+                return;
+            }
+
+            StartPlayback(context, trackPath, player);
+        }
+
+        public static void StopAt(Vector3i position, EntityPlayerLocal player = null)
+        {
+            Debug.Log($"[Boombox] StopAt {position}");
+            if (!WorldContexts.TryGetValue(position, out var context))
+            {
+                return;
+            }
+
+            StopContext(context);
+            NotifyPlayer(player, "Boombox stopped.");
+        }
+
+        public static bool IsWorldPlaying(Vector3i position)
+        {
+            return WorldContexts.TryGetValue(position, out var context) && context.Source != null && context.Source.isPlaying;
+        }
+
+        public static void OnBlockPickedUp(EntityPlayerLocal player, Vector3i position)
+        {
+            Debug.Log($"[Boombox] OnBlockPickedUp at {position} by {player?.EntityName ?? "unknown"}");
+            if (!WorldContexts.TryGetValue(position, out var worldContext) || worldContext.Source == null || worldContext.Source.clip == null)
+            {
+                return;
+            }
+
+            var clip = worldContext.Source.clip;
+            var time = Mathf.Clamp(worldContext.Source.time, 0f, clip.length);
+            var wasPlaying = worldContext.Source.isPlaying;
+            var lastPath = worldContext.LastTrackPath;
+
+            StopContext(worldContext);
+            DestroyContext(worldContext);
+            WorldContexts.Remove(position);
+
+            var playerContext = EnsurePlayerContext(player);
+            playerContext.Source.clip = clip;
+            playerContext.Source.time = time;
+            playerContext.Source.volume = GetGameVolume();
+            playerContext.LastTrackPath = lastPath;
+
+            if (wasPlaying)
+            {
+                playerContext.Source.Play();
+                NotifyPlayer(player, $"Resumed {clip.name} in inventory.");
+            }
+        }
+
+        private static AudioContext EnsurePlayerContext(EntityPlayerLocal player)
+        {
+            if (_playerContext == null || !_playerContext.IsValid)
+            {
+                _playerContext = CreateContext("BoomboxPlayerEmitter");
+            }
+
+            if (_playerContext.Host != null)
+            {
+                _playerContext.Host.transform.SetParent(player.gameObject.transform, false);
+                _playerContext.Host.transform.localPosition = Vector3.zero;
+            }
+
+            return _playerContext;
+        }
+
+        private static AudioContext EnsureWorldContext(Vector3i position)
+        {
+            if (WorldContexts.TryGetValue(position, out var context) && context.IsValid)
+            {
+                return context;
+            }
+
+            context = CreateContext($"BoomboxWorldEmitter_{position.x}_{position.y}_{position.z}");
+            context.Host.transform.position = GetBlockCenter(position);
+            context.BlockPosition = position;
+
+            WorldContexts[position] = context;
+            return context;
+        }
+
+        private static AudioContext CreateContext(string name)
+        {
+            var host = new GameObject(name)
             {
                 hideFlags = HideFlags.HideAndDontSave
             };
 
-            holder.transform.SetParent(player.gameObject.transform, false);
-            holder.transform.localPosition = Vector3.zero;
+            var source = host.AddComponent<AudioSource>();
+            ConfigureSource(source);
 
-            var listener = UnityEngine.Object.FindObjectOfType<AudioListener>();
-            Debug.Log($"[Boombox] AudioListener present: {listener != null}");
+            return new AudioContext
+            {
+                Host = host,
+                Source = source
+            };
+        }
 
-            _audioObject = holder;
-            _audioSource = holder.AddComponent<AudioSource>();
-            _audioSource.playOnAwake = false;
-            _audioSource.loop = false;
-            _audioSource.spatialBlend = 0f;
-            _audioSource.ignoreListenerPause = true;
-            _audioSource.bypassListenerEffects = true;
-            _audioSource.bypassReverbZones = true;
-            _audioSource.volume = GetGameVolume();
-            _audioSource.mute = false;
-            _audioSource.dopplerLevel = 0f;
+        private static void ConfigureSource(AudioSource source)
+        {
+            source.playOnAwake = false;
+            source.loop = false;
+            source.spatialBlend = 1f;
+            source.volume = GetGameVolume();
+            source.rolloffMode = AudioRolloffMode.Linear;
+            source.minDistance = 2f;
+            source.maxDistance = 25f;
+            source.dopplerLevel = 0f;
+            source.spread = 0f;
+            source.mute = false;
+            source.bypassListenerEffects = false;
+            source.bypassReverbZones = false;
+            source.spatialize = false;
+            source.spread = 180f;
+
+        }
+
+        private static void StartPlayback(AudioContext context, string trackPath, EntityPlayerLocal notifyPlayer)
+        {
+            if (context == null || context.Source == null)
+            {
+                return;
+            }
+
+            if (context.Coroutine != null && GameManager.Instance != null)
+            {
+                GameManager.Instance.StopCoroutine(context.Coroutine);
+                context.Coroutine = null;
+            }
+
+            context.LastTrackPath = trackPath;
+            var coroutine = PlayTrackCoroutine(context, trackPath, notifyPlayer);
+            context.Coroutine = GameManager.Instance != null ? GameManager.Instance.StartCoroutine(coroutine) : null;
+        }
+
+        private static IEnumerator PlayTrackCoroutine(AudioContext context, string trackPath, EntityPlayerLocal notifyPlayer)
+        {
+            using var request = UnityWebRequestMultimedia.GetAudioClip(BuildFileUri(trackPath), GetAudioType(trackPath));
+            yield return request.SendWebRequest();
+
+#if UNITY_2020_2_OR_NEWER
+            var failed = request.result != UnityWebRequest.Result.Success;
+#else
+            var failed = request.isNetworkError || request.isHttpError;
+#endif
+            if (failed)
+            {
+                Debug.LogWarning($"[Boombox] Failed to load {trackPath}: {request.error}");
+                NotifyPlayer(notifyPlayer, $"Failed to load {Path.GetFileName(trackPath)}");
+                context.Coroutine = null;
+                yield break;
+            }
+
+            var clip = DownloadHandlerAudioClip.GetContent(request);
+            if (clip == null || clip.length <= 0f)
+            {
+                Debug.LogWarning($"[Boombox] Loaded clip is empty: {trackPath}");
+                NotifyPlayer(notifyPlayer, $"File has no audio data: {Path.GetFileName(trackPath)}");
+                context.Coroutine = null;
+                yield break;
+            }
+
+            clip.name = Path.GetFileName(trackPath);
+
+            context.Source.clip = clip;
+            context.Source.time = 0f;
+            context.Source.volume = GetGameVolume();
+            context.Source.mute = false;
+            context.Source.Play();
+
+            Debug.Log($"[Boombox] Playing '{clip.name}' length={clip.length:F2}s freq={clip.frequency}Hz channels={clip.channels} volume={context.Source.volume:F2}");
+            NotifyPlayer(notifyPlayer, $"Playing {clip.name} [{clip.frequency}Hz, {clip.channels}ch, {clip.length:0.0}s]");
+
+            context.Coroutine = null;
+        }
+
+        private static void StopContext(AudioContext context)
+        {
+            if (context == null)
+            {
+                return;
+            }
+
+            if (context.Coroutine != null && GameManager.Instance != null)
+            {
+                GameManager.Instance.StopCoroutine(context.Coroutine);
+                context.Coroutine = null;
+            }
+
+            if (context.Source != null)
+            {
+                context.Source.Stop();
+                context.Source.clip = null;
+            }
+        }
+
+        private static void DestroyContext(AudioContext context)
+        {
+            if (context?.Host != null)
+            {
+                UnityEngine.Object.Destroy(context.Host);
+                context.Host = null;
+            }
+
+            if (context != null)
+            {
+                context.Source = null;
+                context.Coroutine = null;
+                context.LastTrackPath = string.Empty;
+            }
+        }
+
+        private static string PickRandomTrack(string lastTrackPath)
+        {
+            if (Tracks.Count == 0)
+            {
+                RefreshTrackList();
+            }
+
+            if (Tracks.Count == 0)
+            {
+                return string.Empty;
+            }
+
+            if (Tracks.Count == 1)
+            {
+                return Tracks[0];
+            }
+
+            string candidate;
+            var attempts = 0;
+            do
+            {
+                candidate = Tracks[Random.Next(Tracks.Count)];
+                attempts++;
+            }
+            while (candidate.Equals(lastTrackPath, StringComparison.OrdinalIgnoreCase) && attempts < 10);
+
+            return candidate;
         }
 
         private static void RefreshTrackList()
@@ -136,7 +409,7 @@ namespace Boombox
                 foreach (var file in Directory.EnumerateFiles(DefaultMusicFolder))
                 {
                     var extension = Path.GetExtension(file);
-                    if (SupportedExtensions.Contains(extension))
+                    if (IsSupportedExtension(extension))
                     {
                         Tracks.Add(file);
                     }
@@ -148,103 +421,11 @@ namespace Boombox
             }
         }
 
-        private static string PickRandomTrack()
+        private static bool IsSupportedExtension(string extension)
         {
-            if (Tracks.Count == 0)
-            {
-                return string.Empty;
-            }
-
-            if (Tracks.Count == 1)
-            {
-                _lastTrack = Tracks[0];
-                return Tracks[0];
-            }
-
-            string candidate;
-            var attempts = 0;
-            do
-            {
-                candidate = Tracks[Random.Next(Tracks.Count)];
-                attempts++;
-            } while (candidate.Equals(_lastTrack, StringComparison.OrdinalIgnoreCase) && attempts < 5);
-
-            _lastTrack = candidate;
-            return candidate;
-        }
-
-        private static IEnumerator PlayTrackCoroutine(EntityPlayerLocal player, string trackPath)
-        {
-            _isLoading = true;
-            var audioType = GetAudioType(trackPath);
-            if (audioType == AudioType.UNKNOWN)
-            {
-                NotifyPlayer(player, $"Unsupported audio format: {Path.GetFileName(trackPath)}");
-                _isLoading = false;
-                yield break;
-            }
-
-            var uri = "file:///" + trackPath.Replace("\\", "/");
-            using var request = UnityWebRequestMultimedia.GetAudioClip(uri, audioType);
-            yield return request.SendWebRequest();
-
-#if UNITY_2020_2_OR_NEWER
-            var failed = request.result != UnityWebRequest.Result.Success;
-#else
-#pragma warning disable 618
-            var failed = request.isNetworkError || request.isHttpError;
-#pragma warning restore 618
-#endif
-            if (failed)
-            {
-                NotifyPlayer(player, $"Failed to load {Path.GetFileName(trackPath)}: {request.error}");
-                Debug.LogWarning($"[Boombox] UnityWebRequest failure: {request.error}");
-                _isLoading = false;
-                yield break;
-            }
-
-            var clip = DownloadHandlerAudioClip.GetContent(request);
-            if (clip == null || clip.length <= 0f)
-            {
-                NotifyPlayer(player, $"Loaded clip but it is empty: {Path.GetFileName(trackPath)}");
-                Debug.LogWarning($"[Boombox] Clip empty or null. length={clip?.length}");
-                _isLoading = false;
-                yield break;
-            }
-
-            if (clip.loadState == AudioDataLoadState.Unloaded)
-            {
-                clip.LoadAudioData();
-                while (clip.loadState == AudioDataLoadState.Loading)
-                {
-                    yield return null;
-                }
-            }
-
-            clip.name = Path.GetFileName(trackPath);
-
-            _audioSource.clip = clip;
-            _audioSource.volume = GetGameVolume();
-            _audioSource.mute = false;
-            _audioSource.Play();
-
-            Debug.Log($"[Boombox] Playing '{clip.name}' length={clip.length:F2}s freq={clip.frequency}Hz channels={clip.channels} volume={_audioSource.volume:F2}");
-            NotifyPlayer(player, $"Playing {clip.name} [{clip.frequency}Hz, {clip.channels}ch, {clip.length:0.0}s]");
-
-            _isLoading = false;
-            _currentCoroutine = null;
-        }
-
-        private static AudioType GetAudioType(string trackPath)
-        {
-            var extension = Path.GetExtension(trackPath)?.ToLowerInvariant();
-            return extension switch
-            {
-                ".mp3" => AudioType.MPEG,
-                ".ogg" => AudioType.OGGVORBIS,
-                ".wav" => AudioType.WAV,
-                _ => AudioType.UNKNOWN
-            };
+            return extension != null && (extension.Equals(".mp3", StringComparison.OrdinalIgnoreCase)
+                                         || extension.Equals(".ogg", StringComparison.OrdinalIgnoreCase)
+                                         || extension.Equals(".wav", StringComparison.OrdinalIgnoreCase));
         }
 
         private static float GetGameVolume()
@@ -284,8 +465,29 @@ namespace Boombox
                 volume = 1f;
             }
 
-            Debug.Log($"[Boombox] Volume overall={overall:F2} music={music:F2} ambient={ambient:F2} -> {volume:F2}");
             return volume;
+        }
+
+        private static string BuildFileUri(string path)
+        {
+            return "file:///" + path.Replace("\\", "/");
+        }
+
+        private static AudioType GetAudioType(string trackPath)
+        {
+            var extension = Path.GetExtension(trackPath)?.ToLowerInvariant();
+            return extension switch
+            {
+                ".mp3" => AudioType.MPEG,
+                ".ogg" => AudioType.OGGVORBIS,
+                ".wav" => AudioType.WAV,
+                _ => AudioType.UNKNOWN
+            };
+        }
+
+        private static Vector3 GetBlockCenter(Vector3i position)
+        {
+            return new Vector3(position.x + 0.5f, position.y + 0.5f, position.z + 0.5f);
         }
 
         private static void NotifyPlayer(EntityPlayerLocal player, string message)
@@ -296,34 +498,6 @@ namespace Boombox
             }
 
             GameManager.ShowTooltip(player, message, false, false, 2f);
-        }
-
-        public static void StopPlayback(EntityPlayerLocal player)
-        {
-            if (_audioSource == null)
-            {
-                return;
-            }
-
-            _audioSource.Stop();
-            _audioSource.clip = null;
-
-            if (_audioObject != null)
-            {
-                UnityEngine.Object.Destroy(_audioObject);
-                _audioObject = null;
-                _audioSource = null;
-            }
-
-            _currentCoroutine = null;
-            _isLoading = false;
-
-            if (player != null)
-            {
-                NotifyPlayer(player, "Boombox stopped.");
-            }
-
-            Debug.Log("[Boombox] Playback stopped on right-click.");
         }
     }
 }

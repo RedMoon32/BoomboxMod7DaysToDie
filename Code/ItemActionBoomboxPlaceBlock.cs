@@ -1,21 +1,17 @@
-using UnityEngine;
-
 namespace Boombox
 {
-    public class ItemActionBoomboxPlay : ItemAction
+    public class ItemActionBoomboxPlaceBlock : ItemActionPlaceAsBlock
     {
-        private const float CooldownSeconds = 0.2f;
-        private float _lastPlayTime = -1f;
-
         public override void ExecuteAction(ItemActionData actionData, bool isReleased)
         {
-            if (actionData == null || isReleased)
+            if (actionData == null)
             {
                 return;
             }
 
             if (actionData.invData == null || actionData.invData.holdingEntity is not EntityPlayerLocal player)
             {
+                base.ExecuteAction(actionData, isReleased);
                 return;
             }
 
@@ -26,16 +22,8 @@ namespace Boombox
                 return;
             }
 
-            var now = Time.time;
-            if (_lastPlayTime > 0f && now - _lastPlayTime < CooldownSeconds)
-            {
-                return;
-            }
-
-            _lastPlayTime = now;
-
-            BoomboxAudioManager.PlayNext(player);
-            actionData.HasExecuted = true;
-        }
+            BoomboxAudioManager.BeginPlacement(player);
+            base.ExecuteAction(actionData, isReleased);
     }
+}
 }
