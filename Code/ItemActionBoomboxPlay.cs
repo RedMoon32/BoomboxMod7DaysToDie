@@ -7,6 +7,16 @@ namespace Boombox
         private const float CooldownSeconds = 0.2f;
         private float _lastPlayTime = -1f;
 
+        public override void StartAction(ItemActionData actionData, bool isReleased)
+        {
+            base.StartAction(actionData, isReleased);
+
+            if (actionData?.invData?.holdingEntity is EntityPlayerLocal player)
+            {
+                Debug.Log($"[Boombox] StartAction idx={actionData.indexInEntityOfAction} isReleased={isReleased}");
+            }
+        }
+
         public override void ExecuteAction(ItemActionData actionData, bool isReleased)
         {
             if (actionData == null || isReleased)
@@ -16,6 +26,15 @@ namespace Boombox
 
             if (actionData.invData == null || actionData.invData.holdingEntity is not EntityPlayerLocal player)
             {
+                return;
+            }
+
+            Debug.Log($"[Boombox] ExecuteAction idx={actionData.indexInEntityOfAction} isReleased={isReleased}");
+            var actionIndex = actionData.indexInEntityOfAction;
+            if (actionIndex == 1)
+            {
+                BoomboxAudioManager.StopPlayback(player);
+                actionData.HasExecuted = true;
                 return;
             }
 
@@ -30,5 +49,7 @@ namespace Boombox
             BoomboxAudioManager.PlayRandomTrack(player);
             actionData.HasExecuted = true;
         }
+
+        public override void CancelAction(ItemActionData actionData) => base.CancelAction(actionData);
     }
 }

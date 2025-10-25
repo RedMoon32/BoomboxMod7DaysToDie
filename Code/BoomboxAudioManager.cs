@@ -297,5 +297,33 @@ namespace Boombox
 
             GameManager.ShowTooltip(player, message, false, false, 2f);
         }
+
+        public static void StopPlayback(EntityPlayerLocal player)
+        {
+            if (_audioSource == null)
+            {
+                return;
+            }
+
+            _audioSource.Stop();
+            _audioSource.clip = null;
+
+            if (_audioObject != null)
+            {
+                UnityEngine.Object.Destroy(_audioObject);
+                _audioObject = null;
+                _audioSource = null;
+            }
+
+            _currentCoroutine = null;
+            _isLoading = false;
+
+            if (player != null)
+            {
+                NotifyPlayer(player, "Boombox stopped.");
+            }
+
+            Debug.Log("[Boombox] Playback stopped on right-click.");
+        }
     }
 }

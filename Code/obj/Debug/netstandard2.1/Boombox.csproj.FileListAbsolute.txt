@@ -114,3 +114,4 @@ C:\Program Files (x86)\Steam\steamapps\common\7 Days To Die\Mods\1_Boombox\Code\
 C:\Program Files (x86)\Steam\steamapps\common\7 Days To Die\Mods\1_Boombox\Code\obj\Debug\netstandard2.1\Boombox.csproj.Up2Date
 C:\Program Files (x86)\Steam\steamapps\common\7 Days To Die\Mods\1_Boombox\Code\obj\Debug\netstandard2.1\Boombox.dll
 C:\Program Files (x86)\Steam\steamapps\common\7 Days To Die\Mods\1_Boombox\Code\obj\Debug\netstandard2.1\Boombox.pdb
+C:\Program Files (x86)\Steam\steamapps\common\7 Days To Die\Mods\1_Boombox\Code\obj\Debug\netstandard2.1\Boombox.sourcelink.json
