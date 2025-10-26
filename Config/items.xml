@@ -11,10 +11,6 @@
       <property name="Stacknumber" value="1" />
       <property name="SoundPickup" value="woodblock_grab" />
       <property name="SoundPlace" value="woodblock_place" />
-      <property class="Action0">
-        <property name="Class" value="Boombox.ItemActionBoomboxPlay, Boombox" />
-        <property name="Delay" value="0.25" />
-      </property>
       <property class="Action1">
         <property name="Class" value="Boombox.ItemActionBoomboxPlaceBlock, Boombox" />
         <property name="Blockname" value="boomboxBlock" />
