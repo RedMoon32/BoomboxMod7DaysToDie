@@ -3,9 +3,9 @@
   <append xpath="/Sounds">
     <SoundDataNode name="boombox_music">
       <AudioSource name="@:Sounds/Prefabs/AudioSource_VO_TraderJoel.prefab" />
-	    <AudioClip ClipName="@:Mods/Boombox/:Resources/boombox_01.wav" Loop="false" />
-      <AudioClip ClipName="@:Mods/Boombox/:Resources/boombox_02.wav" Loop="false" />
-      <AudioClip ClipName="@:Mods/Boombox/:Resources/boombox_03.wav" Loop="false" />
+	    <AudioClip ClipName="@:Mods/Boombox/Resources/boombox_01.wav" Loop="false" />
+      <AudioClip ClipName="@:Mods/Boombox/Resources/boombox_02.wav" Loop="false" />
+      <AudioClip ClipName="@:Mods/Boombox/Resources/boombox_03.wav" Loop="false" />
       <LocalCrouchVolumeScale value="1.0" />
       <CrouchNoiseScale value="0.5" />
       <NoiseScale value="1.0" />
