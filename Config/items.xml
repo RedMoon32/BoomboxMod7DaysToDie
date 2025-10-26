@@ -6,7 +6,7 @@
       <property name="CreativeMode" value="Player" />
       <property name="Group" value="Building" />
       <property name="DescriptionKey" value="boomboxDesc" />
-      <property name="CustomIcon" value="resourceWood" />
+      <property name="CustomIcon" value="speaker" />
       <property name="HoldType" value="0" />
       <property name="Stacknumber" value="1" />
       <property name="SoundPickup" value="woodblock_grab" />

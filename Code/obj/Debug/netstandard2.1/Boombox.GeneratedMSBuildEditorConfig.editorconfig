@@ -1,6 +1,6 @@
 is_global = true
 build_property.RootNamespace = Boombox
-build_property.ProjectDir = C:\Program Files (x86)\Steam\steamapps\common\7 Days To Die\Mods\Boombox\code\
+build_property.ProjectDir = C:\Program Files (x86)\Steam\steamapps\common\7 Days To Die\Mods\Boombox\Code\
 build_property.EnableComHosting = 
 build_property.EnableGeneratedComInterfaceComImportInterop = 
 build_property.CsWinRTUseWindowsUIXamlProjections = false

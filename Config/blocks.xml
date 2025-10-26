@@ -2,19 +2,38 @@
 <configs>
   <append xpath="/blocks">
     <block name="boomboxBlock">
-      <property name="Extends" value="woodMaster" />
+      <property name="Extends" value="speaker" />
       <property name="Class" value="Boombox.BlockBoombox, Boombox" />
-      <property name="CreativeMode" value="Player" />
-      <property name="DescriptionKey" value="boomboxDesc" />
-      <property name="Shape" value="Cube" />
-      <property name="IsDecoration" value="true" />
-      <property name="Place" value="TowardsPlacer" />
-      <property name="Collide" value="movement,melee,bullet,arrow,rocket" />
-      <property name="SoundPlace" value="woodblock_place" />
-      <property name="SoundPickup" value="woodblock_grab" />
-      <property name="Stacknumber" value="1" />
-      <property name="MaxDamage" value="400" />
-      <property name="DestroyItem" value="boombox" />
+      <property name="PlaySound" value="alarm1"/>
+      <property name="RequiredPower" value="5"/>
+      <property name="UnlockedBy" value="craftingElectrician"/>
+      <property name="DisplayType" value="blockElectrical"/>
+      <property name="Material" value="Mmetal_weak"/>
+      <property name="Shape" value="ModelEntity"/>
+      <property name="Model" value="@:Entities/Electrical/speakerLoudWallPrefab.prefab"/>
+      <property name="ImposterDontBlock" value="true"/>
+      <property name="WaterFlow" value="permitted"/>
+      <property name="HandleFace" value="South"/>
+      <property name="Collide" value="movement,melee,bullet,arrow,rocket"/>
+      <property name="EconomicValue" value="72"/>
+      <property name="SoundPickup" value="speaker_grab"/>
+      <property name="SoundPlace" value="speaker_place"/>
+      <property name="TraderStageTemplate" value="electricTier1"/><!-- speaker -->
+      <property name="TakeDelay" value="5"/>
+      <property class="RepairItems">
+        <property name="resourceForgedIron" value="3"/>
+        <property name="resourceElectricParts" value="2"/>
+      </property>
+      <drop event="Harvest" name="terrStone" count="0" tool_category="Disassemble"/>
+      <drop event="Harvest" name="resourceElectricParts" count="1,2" tag="salvageHarvest"/>
+      <drop event="Harvest" name="resourceScrapIron" count="5,10" tag="allHarvest,perkJunkMiner"/>
+      <drop event="Destroy" count="0"/>
+      <drop event="Fall" name="scrapMetalPile" count="1" prob="0.75" stick_chance="1"/>
+      <property name="SortOrder1" value="B155"/>
+      <property name="SortOrder2" value="0016"/>
+      <property name="Group" value="Science,TCScience"/>
+      <property name="Tags" value="electricianSkill"/>
+      <property name="FilterTags" value="MC_playerBlocks,SC_electrical"/>
     </block>
   </append>
 </configs>
