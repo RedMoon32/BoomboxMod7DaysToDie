@@ -3,12 +3,9 @@
   <append xpath="/Sounds">
     <SoundDataNode name="boombox_music">
       <AudioSource name="@:Sounds/Prefabs/AudioSource_VO_TraderJoel.prefab" />
-	<AudioClip ClipName="@:Sounds/VO/Trader/Joel/trader_joel_quest_offer_01.wav" Loop="false" Subtitle="trader_joel_quest_offer_01"/>
-	<AudioClip ClipName="@:Sounds/VO/Trader/Joel/trader_joel_quest_offer_02.wav" Loop="false" Subtitle="trader_joel_quest_offer_02"/>
-	<AudioClip ClipName="@:Sounds/VO/Trader/Joel/trader_joel_quest_offer_03.wav" Loop="false" Subtitle="trader_joel_quest_offer_03"/>
-	<AudioClip ClipName="@:Sounds/VO/Trader/Joel/trader_joel_quest_offer_04.wav" Loop="false" Subtitle="trader_joel_quest_offer_04"/>
-	<AudioClip ClipName="@:Sounds/VO/Trader/Joel/trader_joel_quest_offer_05.wav" Loop="false" Subtitle="trader_joel_quest_offer_05"/>
-	<AudioClip ClipName="@:Sounds/VO/Trader/Joel/trader_joel_quest_offer_06.wav" Loop="false" Subtitle="trader_joel_quest_offer_06"/>
+	    <AudioClip ClipName="@:Mods/Boombox/:Resources/boombox_01.wav" Loop="false" />
+      <AudioClip ClipName="@:Mods/Boombox/:Resources/boombox_02.wav" Loop="false" />
+      <AudioClip ClipName="@:Mods/Boombox/:Resources/boombox_03.wav" Loop="false" />
       <LocalCrouchVolumeScale value="1.0" />
       <CrouchNoiseScale value="0.5" />
       <NoiseScale value="1.0" />

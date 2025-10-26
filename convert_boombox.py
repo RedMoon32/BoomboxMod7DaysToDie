@@ -2,9 +2,9 @@ import shutil
 import subprocess
 from pathlib import Path
 
-FFMPEG_PATH = Path(r"C:\Program Files (x86)\Steam\steamapps\common\7 Days To Die\Mods\1_Boombox\ffmpeg\ffmpeg-8.0-essentials_build\bin\ffmpeg.exe")
+FFMPEG_PATH = Path(r"C:\Program Files (x86)\Steam\steamapps\common\7 Days To Die\Mods\Boombox\ffmpeg\ffmpeg-8.0-essentials_build\bin\ffmpeg.exe")
 MUSIC_DIR = Path(r"C:\BoomboxMusic")
-MOD_SOUNDS_DIR = Path(r"C:\Program Files (x86)\Steam\steamapps\common\7 Days To Die\Mods\1_Boombox\Sounds")
+MOD_SOUNDS_DIR = Path(r"C:\Program Files (x86)\Steam\steamapps\common\7 Days To Die\Mods\Boombox\Sounds")
 
 def ensure_ffmpeg() -> None:
     if not FFMPEG_PATH.exists():
