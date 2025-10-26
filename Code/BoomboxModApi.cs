@@ -7,7 +7,6 @@ namespace Boombox
         public void InitMod(Mod modInstance)
         {
             Debug.Log("[Boombox] Mod API initialized");
-            BoomboxAudioManager.Initialize();
         }
     }
 }
