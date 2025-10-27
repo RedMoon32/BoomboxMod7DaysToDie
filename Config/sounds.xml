@@ -2,7 +2,8 @@
 <configs>
   <append xpath="/Sounds">
     <SoundDataNode name="boombox_music">
-      <AudioSource name="@:Sounds/Prefabs/AudioSource_VO_TraderJoel.prefab"/>
+      <AudioSource name="#@modfolder:Resources/boombox.unity3d?AudioSource_Boombox"/>
+      <Noise ID="4" noise="60" time="3" heat_map_strength="0" heat_map_time="0"/>
 
       <!-- Бандл лежит: Mods/Boombox/Resources/Sounds.unity3d -->
       <AudioClip ClipName="#@modfolder:Resources/Sounds.unity3d?1" Loop="false"/>
