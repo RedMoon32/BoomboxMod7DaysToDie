@@ -5,12 +5,11 @@ namespace Boombox
 {
     public class BlockBoombox : Block
     {
-        private static readonly BlockActivationCommand PlayCommand = new("boombox_play_toggle", "hand", true, false, "toggle");
-        private static readonly BlockActivationCommand PickupCommand = new("boombox_pickup", "hand", true, false, "pickup");
+        private static readonly BlockActivationCommand PlayCommand = new BlockActivationCommand("boombox_play_toggle", "hand", true, false, "toggle");
+        private static readonly BlockActivationCommand PickupCommand = new BlockActivationCommand("boombox_pickup", "hand", true, false, "pickup");
 
         private static bool IsClient => !GameManager.IsDedicatedServer;
-
-        private static Vector3 Center(Vector3i pos) => new(pos.x + 0.5f, pos.y + 0.5f, pos.z + 0.5f);
+        private static bool IsServer => GameManager.IsDedicatedServer || SingletonMonoBehaviour<ConnectionManager>.Instance.IsServer;
 
         public override BlockValue OnBlockPlaced(WorldBase world, int clrIdx, Vector3i blockPos, BlockValue blockValue, GameRandom random)
         {
@@ -19,30 +18,21 @@ namespace Boombox
 
         public override void OnBlockUnloaded(WorldBase world, int clrIdx, Vector3i blockPos, BlockValue blockValue)
         {
-            if (IsClient)
-            {
-                BoomboxAudioManager.StopAt(blockPos);
-            }
+            HandleBlockRemoved(world, blockPos);
 
             base.OnBlockUnloaded(world, clrIdx, blockPos, blockValue);
         }
 
         public override DestroyedResult OnBlockDestroyedBy(WorldBase world, int clrIdx, Vector3i blockPos, BlockValue blockValue, int entityId, bool isDrop)
         {
-            if (IsClient)
-            {
-                BoomboxAudioManager.StopAt(blockPos);
-            }
+            HandleBlockRemoved(world, blockPos);
 
             return base.OnBlockDestroyedBy(world, clrIdx, blockPos, blockValue, entityId, isDrop);
         }
 
         public override void OnBlockRemoved(WorldBase world, Chunk chunk, Vector3i blockPos, BlockValue blockValue)
         {
-            if (IsClient)
-            {
-                BoomboxAudioManager.StopAt(blockPos);
-            }
+            HandleBlockRemoved(world, blockPos);
 
             base.OnBlockRemoved(world, chunk, blockPos, blockValue);
         }
@@ -50,28 +40,7 @@ namespace Boombox
 
         public override bool OnBlockActivated(WorldBase world, int clrIdx, Vector3i blockPos, BlockValue blockValue, EntityPlayerLocal player)
         {
-            if (!IsClient)
-            {
-                return true;
-            }
-
-            if (player != null && player.Crouching)
-            {
-                HandlePickup(world, clrIdx, blockPos, player);
-                return true;
-            }
-
-            if (BoomboxAudioManager.IsWorldPlaying(blockPos))
-            {
-                BoomboxAudioManager.StopAt(blockPos);
-                GameManager.ShowTooltip(player, "Boombox stopped.");
-            }
-            else
-            {
-                BoomboxAudioManager.PlayAt(blockPos);
-                GameManager.ShowTooltip(player, "Boombox playing.");
-            }
-
+            HandleActivation(world, clrIdx, blockPos, player);
             return true;
         }
 
@@ -101,25 +70,51 @@ namespace Boombox
 
         public override bool OnBlockActivated(string command, WorldBase world, int clrIdx, Vector3i blockPos, BlockValue blockValue, EntityPlayerLocal player)
         {
-            return OnBlockActivated(world, clrIdx, blockPos, blockValue, player);
+            HandleActivation(world, clrIdx, blockPos, player);
+            return true;
         }
 
-        private static void HandlePickup(WorldBase world, int clrIdx, Vector3i blockPos, EntityPlayerLocal player)
+        private static void HandleActivation(WorldBase worldBase, int clrIdx, Vector3i blockPos, EntityPlayerLocal player)
         {
-            BoomboxAudioManager.StopAt(blockPos);
-
-            world.SetBlockRPC(clrIdx, blockPos, BlockValue.Air);
-
-            var itemValue = ItemClass.GetItem("boombox", false);
-            var stack = new ItemStack(itemValue, 1);
-
-            if (!player.inventory.AddItem(stack))
+            if (worldBase == null)
             {
-                var dropPos = Center(blockPos) + Vector3.up * 0.5f;
-                GameManager.Instance.ItemDropServer(stack, dropPos, Vector3.zero, -1, 60f, false);
+                return;
             }
 
-            GameManager.ShowTooltip(player, "Picked up the boombox.");
+            var wantsPickup = player != null && player.Crouching;
+            var world = worldBase as World;
+            var connection = SingletonMonoBehaviour<ConnectionManager>.Instance;
+
+            if (IsServer)
+            {
+                BoomboxAudioManager.ServerHandleToggle(world, clrIdx, blockPos, null, player, wantsPickup);
+            }
+            else
+            {
+                var request = NetPackageManager
+                    .GetPackage<NetPackageBoomboxToggleRequest>()
+                    .Setup(blockPos, clrIdx, wantsPickup);
+
+                connection?.SendToServer(request, false);
+            }
+        }
+
+        private static void HandleBlockRemoved(WorldBase worldBase, Vector3i blockPos)
+        {
+            if (worldBase == null)
+            {
+                return;
+            }
+
+            if (IsClient)
+            {
+                BoomboxAudioManager.ClientStop(blockPos);
+            }
+
+            if (IsServer && worldBase is World world)
+            {
+                BoomboxAudioManager.ServerHandleBlockRemoved(world, blockPos);
+            }
         }
     }
 }
