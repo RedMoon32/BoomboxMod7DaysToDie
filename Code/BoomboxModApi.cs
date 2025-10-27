@@ -17,10 +17,24 @@ namespace Boombox
 
         private static void RegisterNetPackages()
         {
-            TryRegisterPackage(BoomboxNetPackageIds.ToggleRequest, typeof(NetPackageBoomboxToggleRequest));
-            TryRegisterPackage(BoomboxNetPackageIds.Play, typeof(NetPackageBoomboxPlay));
-            TryRegisterPackage(BoomboxNetPackageIds.Stop, typeof(NetPackageBoomboxStop));
-            TryRegisterPackage(BoomboxNetPackageIds.Sync, typeof(NetPackageBoomboxSync));
+            RegisterPackageWithLog("ToggleRequest", BoomboxNetPackageIds.ToggleRequest, typeof(NetPackageBoomboxToggleRequest));
+            RegisterPackageWithLog("Play", BoomboxNetPackageIds.Play, typeof(NetPackageBoomboxPlay));
+            RegisterPackageWithLog("Stop", BoomboxNetPackageIds.Stop, typeof(NetPackageBoomboxStop));
+            RegisterPackageWithLog("Sync", BoomboxNetPackageIds.Sync, typeof(NetPackageBoomboxSync));
+        }
+
+        private static void RegisterPackageWithLog(string name, int id, Type packageType)
+        {
+            TryRegisterPackage(id, packageType);
+            try
+            {
+                var resolvedId = NetPackageManager.GetPackageId(packageType);
+                Debug.Log($"[Boombox] NetPackage '{name}' resolved ID {resolvedId} (expected {id})");
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError($"[Boombox] Failed to resolve NetPackage '{name}' (expected ID {id}): {ex}");
+            }
         }
 
         private static void TryRegisterPackage(int id, Type packageType)

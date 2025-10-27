@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFramework>netstandard2.1</TargetFramework>
+    <TargetFramework>net472</TargetFramework>
     <AssemblyName>Boombox</AssemblyName>
     <RootNamespace>Boombox</RootNamespace>
     <LangVersion>7.3</LangVersion>
