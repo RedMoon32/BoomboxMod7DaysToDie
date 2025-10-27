@@ -37,6 +37,17 @@ namespace Boombox
             return base.OnBlockDestroyedBy(world, clrIdx, blockPos, blockValue, entityId, isDrop);
         }
 
+        public override void OnBlockRemoved(WorldBase world, Chunk chunk, Vector3i blockPos, BlockValue blockValue)
+        {
+            if (IsClient)
+            {
+                BoomboxAudioManager.StopAt(blockPos);
+            }
+
+            base.OnBlockRemoved(world, chunk, blockPos, blockValue);
+        }
+
+
         public override bool OnBlockActivated(WorldBase world, int clrIdx, Vector3i blockPos, BlockValue blockValue, EntityPlayerLocal player)
         {
             if (!IsClient)
