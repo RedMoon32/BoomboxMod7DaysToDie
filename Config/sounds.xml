@@ -9,11 +9,11 @@
       <AudioClip ClipName="#@modfolder:Resources/Sounds.unity3d?2" Loop="false"/>
       <AudioClip ClipName="#@modfolder:Resources/Sounds.unity3d?3" Loop="false"/>
 
-      <MaxVoices value="4"/>
       <MaxRepeatRate value="0.0"/>
       <LocalCrouchVolumeScale value="1.0"/>
       <CrouchNoiseScale value="0.5"/>
-      <NoiseScale value="1.0"/>
+      <maxVoicesPerEntity value="1"/>
+      <MaxVoices value="1"/>
     </SoundDataNode>
   </append>
 </configs>

@@ -43,6 +43,7 @@ namespace Boombox
 
         public static void PlayAt(Vector3i position)
         {
+            Debug.Log("playing music at position" + position.ToString());
             if (!IsClient)
             {
                 return;
@@ -61,6 +62,7 @@ namespace Boombox
         {
             if (!IsClient)
             {
+                Debug.Log("dont stop as its client");
                 return;
             }
 
@@ -91,19 +93,54 @@ namespace Boombox
 
         private static void StopInternal(Vector3i position)
         {
+            Debug.Log("stopping music at position " + position.ToString());
             if (ActiveHandles.TryGetValue(position, out var handle))
             {
                 ActiveHandles.Remove(position);
-                try
-                {
-                    handle.Stop(-1);
-                }
-                catch (NullReferenceException)
-                {
-                    // ignore - source already cleaned up
-                }
+                StopHandle(handle);
 
                 Manager.Stop(ToWorld(position), SoundName);
+            }
+            else
+            {
+                Debug.Log("no active handles by position to stop");
+            }
+        }
+
+        private static void StopHandle(Handle handle)
+        {
+            if (handle == null)
+            {
+                return;
+            }
+
+            try
+            {
+                StopAudioSource(handle.nearSource);
+                StopAudioSource(handle.farSource);
+            }
+            catch (MissingReferenceException)
+            {
+                // source already destroyed
+            }
+            catch (NullReferenceException)
+            {
+                // source already destroyed
+            }
+        }
+
+        private static void StopAudioSource(AudioSource source)
+        {
+            if (source == null)
+            {
+                return;
+            }
+
+            source.Stop();
+            var gameObject = source.gameObject;
+            if (gameObject != null)
+            {
+                UnityEngine.Object.Destroy(gameObject);
             }
         }
     }
