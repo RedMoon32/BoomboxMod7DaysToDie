@@ -1,3 +1,4 @@
+using System.IO;
 using UnityEngine;
 
 namespace Boombox
@@ -29,11 +30,12 @@ namespace Boombox
 
         public override void write(PooledBinaryWriter writer)
         {
-            writer.Write(_position.x);
-            writer.Write(_position.y);
-            writer.Write(_position.z);
-            writer.Write(_clrIdx);
-            writer.Write(_pickup);
+            var binaryWriter = (BinaryWriter)writer;
+            binaryWriter.Write(_position.x);
+            binaryWriter.Write(_position.y);
+            binaryWriter.Write(_position.z);
+            binaryWriter.Write(_clrIdx);
+            binaryWriter.Write(_pickup);
         }
 
         public override void ProcessPackage(World world, GameManager callbacks)

@@ -1,3 +1,4 @@
+using System.IO;
 using System.Text;
 using UnityEngine;
 
@@ -42,16 +43,17 @@ namespace Boombox
 
         public override void write(PooledBinaryWriter writer)
         {
-            writer.Write(_position.x);
-            writer.Write(_position.y);
-            writer.Write(_position.z);
+            var binaryWriter = (BinaryWriter)writer;
+            binaryWriter.Write(_position.x);
+            binaryWriter.Write(_position.y);
+            binaryWriter.Write(_position.z);
 
             var clip = _clipName ?? string.Empty;
             var bytes = Utf8.GetBytes(clip);
-            writer.Write(bytes.Length);
+            binaryWriter.Write(bytes.Length);
             if (bytes.Length > 0)
             {
-                writer.Write(bytes);
+                binaryWriter.BaseStream.Write(bytes, 0, bytes.Length);
             }
         }
 

@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.IO;
 using System.Text;
 using UnityEngine;
 
@@ -59,18 +60,19 @@ namespace Boombox
 
         public override void write(PooledBinaryWriter writer)
         {
-            writer.Write(_states.Count);
+            var binaryWriter = (BinaryWriter)writer;
+            binaryWriter.Write(_states.Count);
             foreach (var entry in _states)
             {
-                writer.Write(entry.Position.x);
-                writer.Write(entry.Position.y);
-                writer.Write(entry.Position.z);
+                binaryWriter.Write(entry.Position.x);
+                binaryWriter.Write(entry.Position.y);
+                binaryWriter.Write(entry.Position.z);
                 var clip = entry.ClipName ?? string.Empty;
                 var bytes = Utf8.GetBytes(clip);
-                writer.Write(bytes.Length);
+                binaryWriter.Write(bytes.Length);
                 if (bytes.Length > 0)
                 {
-                    writer.Write(bytes);
+                    binaryWriter.BaseStream.Write(bytes, 0, bytes.Length);
                 }
             }
         }

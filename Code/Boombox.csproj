@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFramework>net472</TargetFramework>
+    <TargetFramework>netstandard2.1</TargetFramework>
     <AssemblyName>Boombox</AssemblyName>
     <RootNamespace>Boombox</RootNamespace>
     <LangVersion>7.3</LangVersion>
@@ -15,11 +15,5 @@
     <Reference Include="UnityEngine.AudioModule" HintPath="..\..\..\7DaysToDie_Data\Managed\UnityEngine.AudioModule.dll" />
     <Reference Include="UnityEngine.UnityWebRequestAudioModule" HintPath="..\..\..\7DaysToDie_Data\Managed\UnityEngine.UnityWebRequestAudioModule.dll" />
     <Reference Include="UnityEngine.UnityWebRequestModule" HintPath="..\..\..\7DaysToDie_Data\Managed\UnityEngine.UnityWebRequestModule.dll" />
-    <Reference Include="netstandard" HintPath="..\..\..\7DaysToDie_Data\Managed\netstandard.dll" />
-    <Reference Include="System.Runtime" HintPath="..\..\..\7DaysToDie_Data\Managed\System.Runtime.dll" />
-  </ItemGroup>
-  <ItemGroup>
-    <PackageReference Include="System.Memory" Version="4.5.5" />
-    <PackageReference Include="System.Runtime.CompilerServices.Unsafe" Version="4.5.3" />
   </ItemGroup>
 </Project>
