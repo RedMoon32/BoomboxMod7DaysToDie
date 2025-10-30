@@ -3,7 +3,7 @@
   <append xpath="/Sounds">
     <SoundDataNode name="boombox_music">
       <AudioSource name="#@modfolder:Resources/boombox.unity3d?AudioSource_Boombox"/>
-      <Noise ID="3" noise="120" time="60" heat_map_strength="0" heat_map_time="0"/>
+      <Noise ID="3" noise="110" time="6" muffled_when_crouched="0.65" heat_map_strength="0" heat_map_time="0"/>
 
       <!-- Бандл лежит: Mods/Boombox/Resources/Sounds.unity3d -->
       <AudioClip ClipName="#@modfolder:Resources/Sounds.unity3d?1" Loop="false"/>

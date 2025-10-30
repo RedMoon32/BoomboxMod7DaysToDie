@@ -109,6 +109,8 @@ namespace Boombox
                 {
                     ClientPlay(position, state.ClipName);
                 }
+
+                EmitNoise(world, position, player);
             }
 
             if (shouldStop)
@@ -155,6 +157,23 @@ namespace Boombox
 
             var playerId = player?.entityId ?? clientInfo?.entityId ?? -1;
             gameManager.PickupBlockServer(clrIdx, position, blockValue, playerId, clientInfo?.PlatformId);
+        }
+
+        private static void EmitNoise(World world, Vector3i position, EntityPlayer instigator)
+        {
+            if (world?.aiDirector == null)
+            {
+                return;
+            }
+
+            try
+            {
+                world.aiDirector.NotifyNoise(instigator, ToWorld(position), SoundName, 1f);
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError($"[Boombox] Failed to emit noise: {ex}");
+            }
         }
 
         public static void ServerHandleBlockRemoved(World world, Vector3i position)
