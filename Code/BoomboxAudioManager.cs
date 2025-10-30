@@ -1,6 +1,9 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Xml.Linq;
 using Audio;
 using UnityEngine;
 
@@ -10,13 +13,34 @@ namespace Boombox
     {
         private const string SoundName = "boombox_music";
 
-        // Keep clip list in sync with Config/sounds.xml.
-        private static readonly string[] ClipNames =
+        // Clip list is loaded from Config/sounds.xml next to the DLL.
+        private static readonly object ClipCacheSyncRoot = new object();
+        private static string[] cachedClipNames;
+
+        private static readonly object RandomSyncRoot = new object();
+        private static readonly System.Random Random = new System.Random();
+
+        private static string[] ClipNames
         {
-            "#@modfolder:Resources/Sounds.unity3d?1",
-            "#@modfolder:Resources/Sounds.unity3d?2",
-            "#@modfolder:Resources/Sounds.unity3d?3"
-        };
+            get
+            {
+                var cache = cachedClipNames;
+                if (cache != null)
+                {
+                    return cache;
+                }
+
+                lock (ClipCacheSyncRoot)
+                {
+                    if (cachedClipNames == null)
+                    {
+                        cachedClipNames = LoadClipNamesFromConfig();
+                    }
+
+                    return cachedClipNames;
+                }
+            }
+        }
 
         private static readonly Dictionary<Vector3i, Handle> ActiveHandles = new Dictionary<Vector3i, Handle>();
         private static readonly Dictionary<Vector3i, string> ClientStates = new Dictionary<Vector3i, string>();
@@ -339,23 +363,54 @@ namespace Boombox
             SingletonMonoBehaviour<ConnectionManager>.Instance.SendPackage(package, false, -1, -1, -1, null, -1, false);
         }
 
+        private static string[] LoadClipNamesFromConfig()
+        {
+            try
+            {
+                var assemblyPath = typeof(BoomboxAudioManager).Assembly.Location;
+                if (!string.IsNullOrEmpty(assemblyPath))
+                {
+                    var assemblyDirectory = Path.GetDirectoryName(assemblyPath) ?? string.Empty;
+                    var path = Path.Combine(assemblyDirectory, "Config", "sounds.xml");
+                    if (File.Exists(path))
+                    {
+                        var doc = XDocument.Load(path);
+                        var clipNames = doc
+                            .Descendants("SoundDataNode")
+                            .Where(node => string.Equals((string)node.Attribute("name"), SoundName, StringComparison.OrdinalIgnoreCase))
+                            .Elements("AudioClip")
+                            .Select(element => (string)element.Attribute("ClipName"))
+                            .Where(name => !string.IsNullOrEmpty(name))
+                            .Distinct()
+                            .ToArray();
+
+                        if (clipNames.Length > 0)
+                        {
+                            return clipNames;
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.LogWarning($"[Boombox] Failed to load clip names from sounds.xml: {ex}");
+            }
+
+            return Array.Empty<string>();
+        }
+
         private static string SelectClip(World world, Vector3i position, int toggleIndex)
         {
-            if (ClipNames.Length == 0)
+            var clipNames = ClipNames;
+            if (clipNames.Length == 0)
             {
                 return string.Empty;
             }
 
-            unchecked
+            lock (RandomSyncRoot)
             {
-                var hash = 17;
-                hash = hash * 31 + world.Seed;
-                hash = hash * 31 + position.x;
-                hash = hash * 31 + position.y;
-                hash = hash * 31 + position.z;
-                hash = hash * 31 + toggleIndex;
-                var index = Mathf.Abs(hash) % ClipNames.Length;
-                return ClipNames[index];
+                var index = Random.Next(clipNames.Length);
+                return clipNames[index];
             }
         }
 

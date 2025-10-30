@@ -9,6 +9,38 @@
       <AudioClip ClipName="#@modfolder:Resources/Sounds.unity3d?1" Loop="false"/>
       <AudioClip ClipName="#@modfolder:Resources/Sounds.unity3d?2" Loop="false"/>
       <AudioClip ClipName="#@modfolder:Resources/Sounds.unity3d?3" Loop="false"/>
+      <AudioClip ClipName="#@modfolder:Resources/Sounds.unity3d?4" Loop="false"/>
+      <AudioClip ClipName="#@modfolder:Resources/Sounds.unity3d?5" Loop="false"/>
+      <AudioClip ClipName="#@modfolder:Resources/Sounds.unity3d?6" Loop="false"/>
+      <AudioClip ClipName="#@modfolder:Resources/Sounds.unity3d?7" Loop="false"/>
+      <AudioClip ClipName="#@modfolder:Resources/Sounds.unity3d?8" Loop="false"/>
+      <AudioClip ClipName="#@modfolder:Resources/Sounds.unity3d?9" Loop="false"/>
+      <AudioClip ClipName="#@modfolder:Resources/Sounds.unity3d?10" Loop="false"/>
+      <AudioClip ClipName="#@modfolder:Resources/Sounds.unity3d?11" Loop="false"/>
+      <AudioClip ClipName="#@modfolder:Resources/Sounds.unity3d?12" Loop="false"/>
+      <AudioClip ClipName="#@modfolder:Resources/Sounds.unity3d?13" Loop="false"/>
+      <AudioClip ClipName="#@modfolder:Resources/Sounds.unity3d?14" Loop="false"/>
+      <AudioClip ClipName="#@modfolder:Resources/Sounds.unity3d?15" Loop="false"/>
+      <AudioClip ClipName="#@modfolder:Resources/Sounds.unity3d?16" Loop="false"/>
+      <AudioClip ClipName="#@modfolder:Resources/Sounds.unity3d?17" Loop="false"/>
+      <AudioClip ClipName="#@modfolder:Resources/Sounds.unity3d?18" Loop="false"/>
+      <AudioClip ClipName="#@modfolder:Resources/Sounds.unity3d?19" Loop="false"/>
+      <AudioClip ClipName="#@modfolder:Resources/Sounds.unity3d?20" Loop="false"/>
+      <AudioClip ClipName="#@modfolder:Resources/Sounds.unity3d?21" Loop="false"/>
+      <AudioClip ClipName="#@modfolder:Resources/Sounds.unity3d?22" Loop="false"/>
+      <AudioClip ClipName="#@modfolder:Resources/Sounds.unity3d?23" Loop="false"/>
+      <AudioClip ClipName="#@modfolder:Resources/Sounds.unity3d?24" Loop="false"/>
+      <AudioClip ClipName="#@modfolder:Resources/Sounds.unity3d?25" Loop="false"/>
+      <AudioClip ClipName="#@modfolder:Resources/Sounds.unity3d?26" Loop="false"/>
+      <AudioClip ClipName="#@modfolder:Resources/Sounds.unity3d?27" Loop="false"/>
+      <AudioClip ClipName="#@modfolder:Resources/Sounds.unity3d?28" Loop="false"/>
+      <AudioClip ClipName="#@modfolder:Resources/Sounds.unity3d?29" Loop="false"/>
+      <AudioClip ClipName="#@modfolder:Resources/Sounds.unity3d?30" Loop="false"/>
+      <AudioClip ClipName="#@modfolder:Resources/Sounds.unity3d?31" Loop="false"/>
+      <AudioClip ClipName="#@modfolder:Resources/Sounds.unity3d?32" Loop="false"/>
+      <AudioClip ClipName="#@modfolder:Resources/Sounds.unity3d?33" Loop="false"/>
+      <AudioClip ClipName="#@modfolder:Resources/Sounds.unity3d?34" Loop="false"/>
+      <AudioClip ClipName="#@modfolder:Resources/Sounds.unity3d?35" Loop="false"/>
 
       <MaxRepeatRate value="0.0"/>
       <LocalCrouchVolumeScale value="1.0"/>
