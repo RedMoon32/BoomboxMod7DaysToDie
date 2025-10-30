@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using Audio;
 using UnityEngine;
@@ -45,6 +46,12 @@ namespace Boombox
 
             lock (ServerSyncRoot)
             {
+                foreach (var state in ServerStates.Values)
+                {
+                    state.IsPlaying = false;
+                    StopNoiseLoop(state);
+                }
+
                 ServerStates.Clear();
             }
         }
@@ -58,6 +65,12 @@ namespace Boombox
 
             lock (ServerSyncRoot)
             {
+                foreach (var state in ServerStates.Values)
+                {
+                    state.IsPlaying = false;
+                    StopNoiseLoop(state);
+                }
+
                 ServerStates.Clear();
             }
         }
@@ -111,10 +124,12 @@ namespace Boombox
                 }
 
                 EmitNoise(world, position, player);
+                StartNoiseLoop(world, position, state, player);
             }
 
             if (shouldStop)
             {
+                StopNoiseLoop(state);
                 BroadcastStop(position);
                 if (!GameManager.IsDedicatedServer)
                 {
@@ -139,13 +154,15 @@ namespace Boombox
                 }
             }
 
-            if (previousState != null && previousState.IsPlaying)
+        if (previousState != null && previousState.IsPlaying)
+        {
+            previousState.IsPlaying = false;
+            StopNoiseLoop(previousState);
+            BroadcastStop(position);
+            if (!GameManager.IsDedicatedServer)
             {
-                BroadcastStop(position);
-                if (!GameManager.IsDedicatedServer)
-                {
-                    ClientStop(position);
-                }
+                ClientStop(position);
+            }
             }
 
             var blockValue = world.GetBlock(position);
@@ -176,6 +193,71 @@ namespace Boombox
             }
         }
 
+        private static void StartNoiseLoop(World world, Vector3i position, BoomboxServerState state, EntityPlayer instigator)
+        {
+            StopNoiseLoop(state);
+
+            var gameManager = GameManager.Instance;
+            if (gameManager == null)
+            {
+                return;
+            }
+
+            state.LastActivatorEntityId = instigator?.entityId ?? -1;
+            state.NoiseCoroutine = gameManager.StartCoroutine(NoisePulseRoutine(world, position, state));
+        }
+
+        private static void StopNoiseLoop(BoomboxServerState state)
+        {
+            if (state == null)
+            {
+                return;
+            }
+
+            if (state.NoiseCoroutine != null)
+            {
+                var gameManager = GameManager.Instance;
+                if (gameManager != null)
+                {
+                    gameManager.StopCoroutine(state.NoiseCoroutine);
+                }
+
+                state.NoiseCoroutine = null;
+            }
+
+            state.LastActivatorEntityId = -1;
+        }
+
+        private static IEnumerator NoisePulseRoutine(World world, Vector3i position, BoomboxServerState state)
+        {
+            var wait = new WaitForSeconds(10f);
+            while (state.IsPlaying)
+            {
+                if (world == null)
+                {
+                    break;
+                }
+
+                yield return wait;
+
+                if (!state.IsPlaying || world == null)
+                {
+                    break;
+                }
+
+                EntityPlayer instigator = null;
+                if (state.LastActivatorEntityId != -1)
+                {
+                    instigator = world.GetEntity(state.LastActivatorEntityId) as EntityPlayer;
+                }
+
+                EmitNoise(world, position, instigator);
+            }
+
+            state.NoiseCoroutine = null;
+            state.LastActivatorEntityId = -1;
+        }
+
         public static void ServerHandleBlockRemoved(World world, Vector3i position)
         {
             if (world == null || !IsServer())
@@ -184,15 +266,23 @@ namespace Boombox
             }
 
             var shouldStop = false;
+            BoomboxServerState removedState = null;
             lock (ServerSyncRoot)
             {
-                if (ServerStates.TryGetValue(position, out var state) && state.IsPlaying)
+                if (ServerStates.TryGetValue(position, out var state))
                 {
-                    shouldStop = true;
+                    removedState = state;
+                    shouldStop = state.IsPlaying;
                 }
 
                 ServerStates.Remove(position);
             }
+
+        if (removedState != null)
+        {
+            removedState.IsPlaying = false;
+            StopNoiseLoop(removedState);
+        }
 
             if (shouldStop)
             {
@@ -430,6 +520,8 @@ namespace Boombox
             public bool IsPlaying;
             public string ClipName = string.Empty;
             public int ToggleCount;
+            public Coroutine NoiseCoroutine;
+            public int LastActivatorEntityId = -1;
         }
     }
 }
