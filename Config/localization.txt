@@ -1,3 +1,5 @@
 Key,File,Type,UsedInMainMenu,NoTranslate,english,Context / Alternate Text,german,spanish,french,italian,japanese,koreana,polish,brazilian,russian,turkish,schinese,tchinese
 boombox,items,Item,,,Boombox,,,,,,,,,,,,
 boomboxDesc,items,Item,,,Plays a random track from C:\BoomboxMusic.,,,,,,,,,,,,
+boomboxBlock,items,Item,,,Boombox,,,,,,,,,,,,
+boomboxBlockDesc,items,Item,,,Plays a random track from C:\BoomboxMusic.,,,,,,,,,,,,

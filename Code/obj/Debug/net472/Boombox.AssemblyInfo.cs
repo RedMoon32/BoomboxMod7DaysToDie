@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("Boombox")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+4c6ff6ae65b35e95567eaa6306db800d92c8fd0f")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+a1d2dabb27218ccd8cee6f27b211373fc79b6225")]
 [assembly: System.Reflection.AssemblyProductAttribute("Boombox")]
 [assembly: System.Reflection.AssemblyTitleAttribute("Boombox")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

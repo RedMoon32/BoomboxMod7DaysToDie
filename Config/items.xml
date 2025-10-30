@@ -1,26 +1,2 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<configs>
-  <append xpath="/items">
-    <item name="boombox">
-      <property name="Extends" value="resourceWood" />
-      <property name="CreativeMode" value="Player" />
-      <property name="Group" value="Building" />
-      <property name="DescriptionKey" value="boomboxDesc" />
-      <property name="CustomIcon" value="speaker" />
-      <property name="HoldType" value="0" />
-      <property name="Stacknumber" value="1" />
-      <property name="SoundPickup" value="woodblock_grab" />
-      <property name="SoundPlace" value="woodblock_place" />
-      <property class="Action1">
-        <property name="Class" value="Boombox.ItemActionBoomboxPlaceBlock, Boombox" />
-        <property name="Blockname" value="boomboxBlock" />
-        <property name="Delay" value="0.25" />
-      </property>
-      <effect_group name="boomboxItemEffects" tiered="false">
-        <passive_effect name="EntityDamage" operation="base_set" value="0" />
-        <passive_effect name="BlockDamage" operation="base_set" value="0" />
-        <passive_effect name="StaminaLoss" operation="base_set" value="0" />
-      </effect_group>
-    </item>
-  </append>
-</configs>
+<configs />
