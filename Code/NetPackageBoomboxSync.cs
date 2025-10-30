@@ -60,6 +60,7 @@ namespace Boombox
 
         public override void write(PooledBinaryWriter writer)
         {
+            base.write(writer);
             var binaryWriter = (BinaryWriter)writer;
             binaryWriter.Write(_states.Count);
             foreach (var entry in _states)

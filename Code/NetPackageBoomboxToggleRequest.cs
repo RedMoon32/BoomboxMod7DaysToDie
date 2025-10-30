@@ -30,6 +30,7 @@ namespace Boombox
 
         public override void write(PooledBinaryWriter writer)
         {
+            base.write(writer);
             var binaryWriter = (BinaryWriter)writer;
             binaryWriter.Write(_position.x);
             binaryWriter.Write(_position.y);

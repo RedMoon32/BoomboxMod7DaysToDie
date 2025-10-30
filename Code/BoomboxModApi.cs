@@ -8,10 +8,22 @@ namespace Boombox
         public void InitMod(Mod modInstance)
         {
             Debug.Log("[Boombox] Mod API initialized");
+            try
+            {
+                Debug.Log("[Boombox] Enumerating NetPackage implementations");
+                ReflectionHelpers.FindTypesImplementingBase(typeof(NetPackage), (Type packageType) =>
+                {
+                    Debug.Log($"[Boombox] NetPackage discovered: {packageType.FullName}");
+                });
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError($"[Boombox] Failed to enumerate NetPackage implementations: {ex}");
+            }
 
             ModEvents.GameStartDone.RegisterHandler(OnGameStartDone);
             ModEvents.WorldShuttingDown.RegisterHandler(OnWorldShuttingDown);
-            ModEvents.PlayerSpawnedInWorld.RegisterHandler(OnPlayerSpawnedInWorld);
+            //ModEvents.PlayerSpawnedInWorld.RegisterHandler(OnPlayerSpawnedInWorld);
         }
 
         private static void OnGameStartDone(ref ModEvents.SGameStartDoneData data)
