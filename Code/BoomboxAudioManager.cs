@@ -71,7 +71,7 @@ namespace Boombox
 
             if (pickup)
             {
-                ServerHandlePickup(world, clrIdx, position, player);
+                ServerHandlePickup(world, clrIdx, position, clientInfo, player);
                 return;
             }
 
@@ -121,7 +121,7 @@ namespace Boombox
             }
         }
 
-        private static void ServerHandlePickup(World world, int clrIdx, Vector3i position, EntityPlayer player)
+        private static void ServerHandlePickup(World world, int clrIdx, Vector3i position, ClientInfo clientInfo, EntityPlayer player)
         {
             if (world == null)
             {
@@ -146,18 +146,15 @@ namespace Boombox
                 }
             }
 
-            world.SetBlockRPC(clrIdx, position, BlockValue.Air);
-
-            var itemValue = ItemClass.GetItem("boombox", false);
-            var stack = new ItemStack(itemValue, 1);
-
-            if (player != null && player.inventory != null && player.inventory.AddItem(stack))
+            var blockValue = world.GetBlock(position);
+            var gameManager = GameManager.Instance;
+            if (gameManager == null)
             {
                 return;
             }
 
-            var dropPos = ToWorld(position) + Vector3.up * 0.5f;
-            GameManager.Instance.ItemDropServer(stack, dropPos, Vector3.zero, -1, 60f, false);
+            var playerId = player?.entityId ?? clientInfo?.entityId ?? -1;
+            gameManager.PickupBlockServer(clrIdx, position, blockValue, playerId, clientInfo?.PlatformId);
         }
 
         public static void ServerHandleBlockRemoved(World world, Vector3i position)
