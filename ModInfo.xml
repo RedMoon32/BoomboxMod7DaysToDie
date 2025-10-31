@@ -2,7 +2,7 @@
 <xml>
     <Name value="Boombox" />
     <DisplayName value="Boombox" />
-    <Description value="Adds a boombox item that plays tracks from C:\BoomboxMusic." />
+    <Description value="Adds a boombox item that plays tracks from player music" />
     <Author value="Codex" />
     <Version value="1.0.0" />
     <GameVersion value="Alpha 21.0+" />
