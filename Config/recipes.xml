@@ -2,7 +2,7 @@
 <configs>
   <append xpath="/recipes">
     <recipe name="boomboxBlock" count="1" craft_time="2" always_unlocked="true">
-      <ingredient name="resourceWood" count="2" />
+      <ingredient name="resourceForgedIron" count="10" />
     </recipe>
   </append>
 </configs>
