@@ -1,1 +1,12 @@
 Resources/Sounds.unity3d
+
+# Build outputs and IDE caches in Code/
+Code/bin/
+Code/obj/
+Code/*.user
+Code/*.suo
+Code/*.tmp
+Code/*.log
+
+# Editor backup files
+Code/*.bak
