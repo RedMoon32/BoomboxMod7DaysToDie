@@ -16,12 +16,12 @@ namespace Boombox
             return base.OnBlockPlaced(world, clrIdx, blockPos, blockValue, random);
         }
 
-        public override void OnBlockUnloaded(WorldBase world, int clrIdx, Vector3i blockPos, BlockValue blockValue)
-        {
-            HandleBlockRemoved(world, blockPos);
+        // public override void OnBlockUnloaded(WorldBase world, int clrIdx, Vector3i blockPos, BlockValue blockValue)
+        // {
+        //     HandleBlockRemoved(world, blockPos);
 
-            base.OnBlockUnloaded(world, clrIdx, blockPos, blockValue);
-        }
+        //     base.OnBlockUnloaded(world, clrIdx, blockPos, blockValue);
+        // }
 
         public override DestroyedResult OnBlockDestroyedBy(WorldBase world, int clrIdx, Vector3i blockPos, BlockValue blockValue, int entityId, bool isDrop)
         {
