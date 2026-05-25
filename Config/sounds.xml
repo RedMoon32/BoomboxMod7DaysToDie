@@ -1,52 +1,355 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <configs>
   <append xpath="/Sounds">
-    <SoundDataNode name="boombox_music">
+    <SoundDataNode name="boombox_music_track01">
       <AudioSource name="#@modfolder:Resources/boombox.unity3d?AudioSource_Boombox"/>
       <Noise ID="3" noise="1000" time="5" muffled_when_crouched="0.65" heat_map_strength="10" heat_map_time="1000"/>
-
-      <!-- Бандл лежит: Mods/Boombox/Resources/Sounds.unity3d -->
-      <AudioClip ClipName="#@modfolder:Resources/Sounds.unity3d?1" Loop="false"/>
-      <AudioClip ClipName="#@modfolder:Resources/Sounds.unity3d?2" Loop="false"/>
-      <AudioClip ClipName="#@modfolder:Resources/Sounds.unity3d?3" Loop="false"/>
-      <AudioClip ClipName="#@modfolder:Resources/Sounds.unity3d?4" Loop="false"/>
-      <AudioClip ClipName="#@modfolder:Resources/Sounds.unity3d?5" Loop="false"/>
-      <AudioClip ClipName="#@modfolder:Resources/Sounds.unity3d?6" Loop="false"/>
-      <AudioClip ClipName="#@modfolder:Resources/Sounds.unity3d?7" Loop="false"/>
-      <AudioClip ClipName="#@modfolder:Resources/Sounds.unity3d?8" Loop="false"/>
-      <AudioClip ClipName="#@modfolder:Resources/Sounds.unity3d?9" Loop="false"/>
-      <AudioClip ClipName="#@modfolder:Resources/Sounds.unity3d?10" Loop="false"/>
-      <AudioClip ClipName="#@modfolder:Resources/Sounds.unity3d?11" Loop="false"/>
-      <AudioClip ClipName="#@modfolder:Resources/Sounds.unity3d?12" Loop="false"/>
-      <AudioClip ClipName="#@modfolder:Resources/Sounds.unity3d?13" Loop="false"/>
-      <AudioClip ClipName="#@modfolder:Resources/Sounds.unity3d?14" Loop="false"/>
-      <AudioClip ClipName="#@modfolder:Resources/Sounds.unity3d?15" Loop="false"/>
-      <AudioClip ClipName="#@modfolder:Resources/Sounds.unity3d?16" Loop="false"/>
-      <AudioClip ClipName="#@modfolder:Resources/Sounds.unity3d?17" Loop="false"/>
-      <AudioClip ClipName="#@modfolder:Resources/Sounds.unity3d?18" Loop="false"/>
-      <AudioClip ClipName="#@modfolder:Resources/Sounds.unity3d?19" Loop="false"/>
-      <AudioClip ClipName="#@modfolder:Resources/Sounds.unity3d?20" Loop="false"/>
-      <AudioClip ClipName="#@modfolder:Resources/Sounds.unity3d?21" Loop="false"/>
-      <AudioClip ClipName="#@modfolder:Resources/Sounds.unity3d?22" Loop="false"/>
-      <AudioClip ClipName="#@modfolder:Resources/Sounds.unity3d?23" Loop="false"/>
-      <AudioClip ClipName="#@modfolder:Resources/Sounds.unity3d?24" Loop="false"/>
-      <AudioClip ClipName="#@modfolder:Resources/Sounds.unity3d?25" Loop="false"/>
-      <AudioClip ClipName="#@modfolder:Resources/Sounds.unity3d?26" Loop="false"/>
-      <AudioClip ClipName="#@modfolder:Resources/Sounds.unity3d?27" Loop="false"/>
-      <AudioClip ClipName="#@modfolder:Resources/Sounds.unity3d?28" Loop="false"/>
-      <AudioClip ClipName="#@modfolder:Resources/Sounds.unity3d?29" Loop="false"/>
-      <AudioClip ClipName="#@modfolder:Resources/Sounds.unity3d?30" Loop="false"/>
-      <AudioClip ClipName="#@modfolder:Resources/Sounds.unity3d?31" Loop="false"/>
-      <AudioClip ClipName="#@modfolder:Resources/Sounds.unity3d?32" Loop="false"/>
-      <AudioClip ClipName="#@modfolder:Resources/Sounds.unity3d?33" Loop="false"/>
-      <AudioClip ClipName="#@modfolder:Resources/Sounds.unity3d?34" Loop="false"/>
-      <AudioClip ClipName="#@modfolder:Resources/Sounds.unity3d?35" Loop="false"/>
-
       <MaxRepeatRate value="0.0"/>
       <LocalCrouchVolumeScale value="1.0"/>
       <CrouchNoiseScale value="0.5"/>
       <maxVoicesPerEntity value="1"/>
       <MaxVoices value="1"/>
+      <AudioClip ClipName="#@modfolder:Resources/Sounds.unity3d?1" Loop="false"/>
+    </SoundDataNode>
+    <SoundDataNode name="boombox_music_track02">
+      <AudioSource name="#@modfolder:Resources/boombox.unity3d?AudioSource_Boombox"/>
+      <Noise ID="3" noise="1000" time="5" muffled_when_crouched="0.65" heat_map_strength="10" heat_map_time="1000"/>
+      <MaxRepeatRate value="0.0"/>
+      <LocalCrouchVolumeScale value="1.0"/>
+      <CrouchNoiseScale value="0.5"/>
+      <maxVoicesPerEntity value="1"/>
+      <MaxVoices value="1"/>
+      <AudioClip ClipName="#@modfolder:Resources/Sounds.unity3d?2" Loop="false"/>
+    </SoundDataNode>
+    <SoundDataNode name="boombox_music_track03">
+      <AudioSource name="#@modfolder:Resources/boombox.unity3d?AudioSource_Boombox"/>
+      <Noise ID="3" noise="1000" time="5" muffled_when_crouched="0.65" heat_map_strength="10" heat_map_time="1000"/>
+      <MaxRepeatRate value="0.0"/>
+      <LocalCrouchVolumeScale value="1.0"/>
+      <CrouchNoiseScale value="0.5"/>
+      <maxVoicesPerEntity value="1"/>
+      <MaxVoices value="1"/>
+      <AudioClip ClipName="#@modfolder:Resources/Sounds.unity3d?3" Loop="false"/>
+    </SoundDataNode>
+    <SoundDataNode name="boombox_music_track04">
+      <AudioSource name="#@modfolder:Resources/boombox.unity3d?AudioSource_Boombox"/>
+      <Noise ID="3" noise="1000" time="5" muffled_when_crouched="0.65" heat_map_strength="10" heat_map_time="1000"/>
+      <MaxRepeatRate value="0.0"/>
+      <LocalCrouchVolumeScale value="1.0"/>
+      <CrouchNoiseScale value="0.5"/>
+      <maxVoicesPerEntity value="1"/>
+      <MaxVoices value="1"/>
+      <AudioClip ClipName="#@modfolder:Resources/Sounds.unity3d?4" Loop="false"/>
+    </SoundDataNode>
+    <SoundDataNode name="boombox_music_track05">
+      <AudioSource name="#@modfolder:Resources/boombox.unity3d?AudioSource_Boombox"/>
+      <Noise ID="3" noise="1000" time="5" muffled_when_crouched="0.65" heat_map_strength="10" heat_map_time="1000"/>
+      <MaxRepeatRate value="0.0"/>
+      <LocalCrouchVolumeScale value="1.0"/>
+      <CrouchNoiseScale value="0.5"/>
+      <maxVoicesPerEntity value="1"/>
+      <MaxVoices value="1"/>
+      <AudioClip ClipName="#@modfolder:Resources/Sounds.unity3d?5" Loop="false"/>
+    </SoundDataNode>
+    <SoundDataNode name="boombox_music_track06">
+      <AudioSource name="#@modfolder:Resources/boombox.unity3d?AudioSource_Boombox"/>
+      <Noise ID="3" noise="1000" time="5" muffled_when_crouched="0.65" heat_map_strength="10" heat_map_time="1000"/>
+      <MaxRepeatRate value="0.0"/>
+      <LocalCrouchVolumeScale value="1.0"/>
+      <CrouchNoiseScale value="0.5"/>
+      <maxVoicesPerEntity value="1"/>
+      <MaxVoices value="1"/>
+      <AudioClip ClipName="#@modfolder:Resources/Sounds.unity3d?6" Loop="false"/>
+    </SoundDataNode>
+    <SoundDataNode name="boombox_music_track07">
+      <AudioSource name="#@modfolder:Resources/boombox.unity3d?AudioSource_Boombox"/>
+      <Noise ID="3" noise="1000" time="5" muffled_when_crouched="0.65" heat_map_strength="10" heat_map_time="1000"/>
+      <MaxRepeatRate value="0.0"/>
+      <LocalCrouchVolumeScale value="1.0"/>
+      <CrouchNoiseScale value="0.5"/>
+      <maxVoicesPerEntity value="1"/>
+      <MaxVoices value="1"/>
+      <AudioClip ClipName="#@modfolder:Resources/Sounds.unity3d?7" Loop="false"/>
+    </SoundDataNode>
+    <SoundDataNode name="boombox_music_track08">
+      <AudioSource name="#@modfolder:Resources/boombox.unity3d?AudioSource_Boombox"/>
+      <Noise ID="3" noise="1000" time="5" muffled_when_crouched="0.65" heat_map_strength="10" heat_map_time="1000"/>
+      <MaxRepeatRate value="0.0"/>
+      <LocalCrouchVolumeScale value="1.0"/>
+      <CrouchNoiseScale value="0.5"/>
+      <maxVoicesPerEntity value="1"/>
+      <MaxVoices value="1"/>
+      <AudioClip ClipName="#@modfolder:Resources/Sounds.unity3d?8" Loop="false"/>
+    </SoundDataNode>
+    <SoundDataNode name="boombox_music_track09">
+      <AudioSource name="#@modfolder:Resources/boombox.unity3d?AudioSource_Boombox"/>
+      <Noise ID="3" noise="1000" time="5" muffled_when_crouched="0.65" heat_map_strength="10" heat_map_time="1000"/>
+      <MaxRepeatRate value="0.0"/>
+      <LocalCrouchVolumeScale value="1.0"/>
+      <CrouchNoiseScale value="0.5"/>
+      <maxVoicesPerEntity value="1"/>
+      <MaxVoices value="1"/>
+      <AudioClip ClipName="#@modfolder:Resources/Sounds.unity3d?9" Loop="false"/>
+    </SoundDataNode>
+    <SoundDataNode name="boombox_music_track10">
+      <AudioSource name="#@modfolder:Resources/boombox.unity3d?AudioSource_Boombox"/>
+      <Noise ID="3" noise="1000" time="5" muffled_when_crouched="0.65" heat_map_strength="10" heat_map_time="1000"/>
+      <MaxRepeatRate value="0.0"/>
+      <LocalCrouchVolumeScale value="1.0"/>
+      <CrouchNoiseScale value="0.5"/>
+      <maxVoicesPerEntity value="1"/>
+      <MaxVoices value="1"/>
+      <AudioClip ClipName="#@modfolder:Resources/Sounds.unity3d?10" Loop="false"/>
+    </SoundDataNode>
+    <SoundDataNode name="boombox_music_track11">
+      <AudioSource name="#@modfolder:Resources/boombox.unity3d?AudioSource_Boombox"/>
+      <Noise ID="3" noise="1000" time="5" muffled_when_crouched="0.65" heat_map_strength="10" heat_map_time="1000"/>
+      <MaxRepeatRate value="0.0"/>
+      <LocalCrouchVolumeScale value="1.0"/>
+      <CrouchNoiseScale value="0.5"/>
+      <maxVoicesPerEntity value="1"/>
+      <MaxVoices value="1"/>
+      <AudioClip ClipName="#@modfolder:Resources/Sounds.unity3d?11" Loop="false"/>
+    </SoundDataNode>
+    <SoundDataNode name="boombox_music_track12">
+      <AudioSource name="#@modfolder:Resources/boombox.unity3d?AudioSource_Boombox"/>
+      <Noise ID="3" noise="1000" time="5" muffled_when_crouched="0.65" heat_map_strength="10" heat_map_time="1000"/>
+      <MaxRepeatRate value="0.0"/>
+      <LocalCrouchVolumeScale value="1.0"/>
+      <CrouchNoiseScale value="0.5"/>
+      <maxVoicesPerEntity value="1"/>
+      <MaxVoices value="1"/>
+      <AudioClip ClipName="#@modfolder:Resources/Sounds.unity3d?12" Loop="false"/>
+    </SoundDataNode>
+    <SoundDataNode name="boombox_music_track13">
+      <AudioSource name="#@modfolder:Resources/boombox.unity3d?AudioSource_Boombox"/>
+      <Noise ID="3" noise="1000" time="5" muffled_when_crouched="0.65" heat_map_strength="10" heat_map_time="1000"/>
+      <MaxRepeatRate value="0.0"/>
+      <LocalCrouchVolumeScale value="1.0"/>
+      <CrouchNoiseScale value="0.5"/>
+      <maxVoicesPerEntity value="1"/>
+      <MaxVoices value="1"/>
+      <AudioClip ClipName="#@modfolder:Resources/Sounds.unity3d?13" Loop="false"/>
+    </SoundDataNode>
+    <SoundDataNode name="boombox_music_track14">
+      <AudioSource name="#@modfolder:Resources/boombox.unity3d?AudioSource_Boombox"/>
+      <Noise ID="3" noise="1000" time="5" muffled_when_crouched="0.65" heat_map_strength="10" heat_map_time="1000"/>
+      <MaxRepeatRate value="0.0"/>
+      <LocalCrouchVolumeScale value="1.0"/>
+      <CrouchNoiseScale value="0.5"/>
+      <maxVoicesPerEntity value="1"/>
+      <MaxVoices value="1"/>
+      <AudioClip ClipName="#@modfolder:Resources/Sounds.unity3d?14" Loop="false"/>
+    </SoundDataNode>
+    <SoundDataNode name="boombox_music_track15">
+      <AudioSource name="#@modfolder:Resources/boombox.unity3d?AudioSource_Boombox"/>
+      <Noise ID="3" noise="1000" time="5" muffled_when_crouched="0.65" heat_map_strength="10" heat_map_time="1000"/>
+      <MaxRepeatRate value="0.0"/>
+      <LocalCrouchVolumeScale value="1.0"/>
+      <CrouchNoiseScale value="0.5"/>
+      <maxVoicesPerEntity value="1"/>
+      <MaxVoices value="1"/>
+      <AudioClip ClipName="#@modfolder:Resources/Sounds.unity3d?15" Loop="false"/>
+    </SoundDataNode>
+    <SoundDataNode name="boombox_music_track16">
+      <AudioSource name="#@modfolder:Resources/boombox.unity3d?AudioSource_Boombox"/>
+      <Noise ID="3" noise="1000" time="5" muffled_when_crouched="0.65" heat_map_strength="10" heat_map_time="1000"/>
+      <MaxRepeatRate value="0.0"/>
+      <LocalCrouchVolumeScale value="1.0"/>
+      <CrouchNoiseScale value="0.5"/>
+      <maxVoicesPerEntity value="1"/>
+      <MaxVoices value="1"/>
+      <AudioClip ClipName="#@modfolder:Resources/Sounds.unity3d?16" Loop="false"/>
+    </SoundDataNode>
+    <SoundDataNode name="boombox_music_track17">
+      <AudioSource name="#@modfolder:Resources/boombox.unity3d?AudioSource_Boombox"/>
+      <Noise ID="3" noise="1000" time="5" muffled_when_crouched="0.65" heat_map_strength="10" heat_map_time="1000"/>
+      <MaxRepeatRate value="0.0"/>
+      <LocalCrouchVolumeScale value="1.0"/>
+      <CrouchNoiseScale value="0.5"/>
+      <maxVoicesPerEntity value="1"/>
+      <MaxVoices value="1"/>
+      <AudioClip ClipName="#@modfolder:Resources/Sounds.unity3d?17" Loop="false"/>
+    </SoundDataNode>
+    <SoundDataNode name="boombox_music_track18">
+      <AudioSource name="#@modfolder:Resources/boombox.unity3d?AudioSource_Boombox"/>
+      <Noise ID="3" noise="1000" time="5" muffled_when_crouched="0.65" heat_map_strength="10" heat_map_time="1000"/>
+      <MaxRepeatRate value="0.0"/>
+      <LocalCrouchVolumeScale value="1.0"/>
+      <CrouchNoiseScale value="0.5"/>
+      <maxVoicesPerEntity value="1"/>
+      <MaxVoices value="1"/>
+      <AudioClip ClipName="#@modfolder:Resources/Sounds.unity3d?18" Loop="false"/>
+    </SoundDataNode>
+    <SoundDataNode name="boombox_music_track19">
+      <AudioSource name="#@modfolder:Resources/boombox.unity3d?AudioSource_Boombox"/>
+      <Noise ID="3" noise="1000" time="5" muffled_when_crouched="0.65" heat_map_strength="10" heat_map_time="1000"/>
+      <MaxRepeatRate value="0.0"/>
+      <LocalCrouchVolumeScale value="1.0"/>
+      <CrouchNoiseScale value="0.5"/>
+      <maxVoicesPerEntity value="1"/>
+      <MaxVoices value="1"/>
+      <AudioClip ClipName="#@modfolder:Resources/Sounds.unity3d?19" Loop="false"/>
+    </SoundDataNode>
+    <SoundDataNode name="boombox_music_track20">
+      <AudioSource name="#@modfolder:Resources/boombox.unity3d?AudioSource_Boombox"/>
+      <Noise ID="3" noise="1000" time="5" muffled_when_crouched="0.65" heat_map_strength="10" heat_map_time="1000"/>
+      <MaxRepeatRate value="0.0"/>
+      <LocalCrouchVolumeScale value="1.0"/>
+      <CrouchNoiseScale value="0.5"/>
+      <maxVoicesPerEntity value="1"/>
+      <MaxVoices value="1"/>
+      <AudioClip ClipName="#@modfolder:Resources/Sounds.unity3d?20" Loop="false"/>
+    </SoundDataNode>
+    <SoundDataNode name="boombox_music_track21">
+      <AudioSource name="#@modfolder:Resources/boombox.unity3d?AudioSource_Boombox"/>
+      <Noise ID="3" noise="1000" time="5" muffled_when_crouched="0.65" heat_map_strength="10" heat_map_time="1000"/>
+      <MaxRepeatRate value="0.0"/>
+      <LocalCrouchVolumeScale value="1.0"/>
+      <CrouchNoiseScale value="0.5"/>
+      <maxVoicesPerEntity value="1"/>
+      <MaxVoices value="1"/>
+      <AudioClip ClipName="#@modfolder:Resources/Sounds.unity3d?21" Loop="false"/>
+    </SoundDataNode>
+    <SoundDataNode name="boombox_music_track22">
+      <AudioSource name="#@modfolder:Resources/boombox.unity3d?AudioSource_Boombox"/>
+      <Noise ID="3" noise="1000" time="5" muffled_when_crouched="0.65" heat_map_strength="10" heat_map_time="1000"/>
+      <MaxRepeatRate value="0.0"/>
+      <LocalCrouchVolumeScale value="1.0"/>
+      <CrouchNoiseScale value="0.5"/>
+      <maxVoicesPerEntity value="1"/>
+      <MaxVoices value="1"/>
+      <AudioClip ClipName="#@modfolder:Resources/Sounds.unity3d?22" Loop="false"/>
+    </SoundDataNode>
+    <SoundDataNode name="boombox_music_track23">
+      <AudioSource name="#@modfolder:Resources/boombox.unity3d?AudioSource_Boombox"/>
+      <Noise ID="3" noise="1000" time="5" muffled_when_crouched="0.65" heat_map_strength="10" heat_map_time="1000"/>
+      <MaxRepeatRate value="0.0"/>
+      <LocalCrouchVolumeScale value="1.0"/>
+      <CrouchNoiseScale value="0.5"/>
+      <maxVoicesPerEntity value="1"/>
+      <MaxVoices value="1"/>
+      <AudioClip ClipName="#@modfolder:Resources/Sounds.unity3d?23" Loop="false"/>
+    </SoundDataNode>
+    <SoundDataNode name="boombox_music_track24">
+      <AudioSource name="#@modfolder:Resources/boombox.unity3d?AudioSource_Boombox"/>
+      <Noise ID="3" noise="1000" time="5" muffled_when_crouched="0.65" heat_map_strength="10" heat_map_time="1000"/>
+      <MaxRepeatRate value="0.0"/>
+      <LocalCrouchVolumeScale value="1.0"/>
+      <CrouchNoiseScale value="0.5"/>
+      <maxVoicesPerEntity value="1"/>
+      <MaxVoices value="1"/>
+      <AudioClip ClipName="#@modfolder:Resources/Sounds.unity3d?24" Loop="false"/>
+    </SoundDataNode>
+    <SoundDataNode name="boombox_music_track25">
+      <AudioSource name="#@modfolder:Resources/boombox.unity3d?AudioSource_Boombox"/>
+      <Noise ID="3" noise="1000" time="5" muffled_when_crouched="0.65" heat_map_strength="10" heat_map_time="1000"/>
+      <MaxRepeatRate value="0.0"/>
+      <LocalCrouchVolumeScale value="1.0"/>
+      <CrouchNoiseScale value="0.5"/>
+      <maxVoicesPerEntity value="1"/>
+      <MaxVoices value="1"/>
+      <AudioClip ClipName="#@modfolder:Resources/Sounds.unity3d?25" Loop="false"/>
+    </SoundDataNode>
+    <SoundDataNode name="boombox_music_track26">
+      <AudioSource name="#@modfolder:Resources/boombox.unity3d?AudioSource_Boombox"/>
+      <Noise ID="3" noise="1000" time="5" muffled_when_crouched="0.65" heat_map_strength="10" heat_map_time="1000"/>
+      <MaxRepeatRate value="0.0"/>
+      <LocalCrouchVolumeScale value="1.0"/>
+      <CrouchNoiseScale value="0.5"/>
+      <maxVoicesPerEntity value="1"/>
+      <MaxVoices value="1"/>
+      <AudioClip ClipName="#@modfolder:Resources/Sounds.unity3d?26" Loop="false"/>
+    </SoundDataNode>
+    <SoundDataNode name="boombox_music_track27">
+      <AudioSource name="#@modfolder:Resources/boombox.unity3d?AudioSource_Boombox"/>
+      <Noise ID="3" noise="1000" time="5" muffled_when_crouched="0.65" heat_map_strength="10" heat_map_time="1000"/>
+      <MaxRepeatRate value="0.0"/>
+      <LocalCrouchVolumeScale value="1.0"/>
+      <CrouchNoiseScale value="0.5"/>
+      <maxVoicesPerEntity value="1"/>
+      <MaxVoices value="1"/>
+      <AudioClip ClipName="#@modfolder:Resources/Sounds.unity3d?27" Loop="false"/>
+    </SoundDataNode>
+    <SoundDataNode name="boombox_music_track28">
+      <AudioSource name="#@modfolder:Resources/boombox.unity3d?AudioSource_Boombox"/>
+      <Noise ID="3" noise="1000" time="5" muffled_when_crouched="0.65" heat_map_strength="10" heat_map_time="1000"/>
+      <MaxRepeatRate value="0.0"/>
+      <LocalCrouchVolumeScale value="1.0"/>
+      <CrouchNoiseScale value="0.5"/>
+      <maxVoicesPerEntity value="1"/>
+      <MaxVoices value="1"/>
+      <AudioClip ClipName="#@modfolder:Resources/Sounds.unity3d?28" Loop="false"/>
+    </SoundDataNode>
+    <SoundDataNode name="boombox_music_track29">
+      <AudioSource name="#@modfolder:Resources/boombox.unity3d?AudioSource_Boombox"/>
+      <Noise ID="3" noise="1000" time="5" muffled_when_crouched="0.65" heat_map_strength="10" heat_map_time="1000"/>
+      <MaxRepeatRate value="0.0"/>
+      <LocalCrouchVolumeScale value="1.0"/>
+      <CrouchNoiseScale value="0.5"/>
+      <maxVoicesPerEntity value="1"/>
+      <MaxVoices value="1"/>
+      <AudioClip ClipName="#@modfolder:Resources/Sounds.unity3d?29" Loop="false"/>
+    </SoundDataNode>
+    <SoundDataNode name="boombox_music_track30">
+      <AudioSource name="#@modfolder:Resources/boombox.unity3d?AudioSource_Boombox"/>
+      <Noise ID="3" noise="1000" time="5" muffled_when_crouched="0.65" heat_map_strength="10" heat_map_time="1000"/>
+      <MaxRepeatRate value="0.0"/>
+      <LocalCrouchVolumeScale value="1.0"/>
+      <CrouchNoiseScale value="0.5"/>
+      <maxVoicesPerEntity value="1"/>
+      <MaxVoices value="1"/>
+      <AudioClip ClipName="#@modfolder:Resources/Sounds.unity3d?30" Loop="false"/>
+    </SoundDataNode>
+    <SoundDataNode name="boombox_music_track31">
+      <AudioSource name="#@modfolder:Resources/boombox.unity3d?AudioSource_Boombox"/>
+      <Noise ID="3" noise="1000" time="5" muffled_when_crouched="0.65" heat_map_strength="10" heat_map_time="1000"/>
+      <MaxRepeatRate value="0.0"/>
+      <LocalCrouchVolumeScale value="1.0"/>
+      <CrouchNoiseScale value="0.5"/>
+      <maxVoicesPerEntity value="1"/>
+      <MaxVoices value="1"/>
+      <AudioClip ClipName="#@modfolder:Resources/Sounds.unity3d?31" Loop="false"/>
+    </SoundDataNode>
+    <SoundDataNode name="boombox_music_track32">
+      <AudioSource name="#@modfolder:Resources/boombox.unity3d?AudioSource_Boombox"/>
+      <Noise ID="3" noise="1000" time="5" muffled_when_crouched="0.65" heat_map_strength="10" heat_map_time="1000"/>
+      <MaxRepeatRate value="0.0"/>
+      <LocalCrouchVolumeScale value="1.0"/>
+      <CrouchNoiseScale value="0.5"/>
+      <maxVoicesPerEntity value="1"/>
+      <MaxVoices value="1"/>
+      <AudioClip ClipName="#@modfolder:Resources/Sounds.unity3d?32" Loop="false"/>
+    </SoundDataNode>
+    <SoundDataNode name="boombox_music_track33">
+      <AudioSource name="#@modfolder:Resources/boombox.unity3d?AudioSource_Boombox"/>
+      <Noise ID="3" noise="1000" time="5" muffled_when_crouched="0.65" heat_map_strength="10" heat_map_time="1000"/>
+      <MaxRepeatRate value="0.0"/>
+      <LocalCrouchVolumeScale value="1.0"/>
+      <CrouchNoiseScale value="0.5"/>
+      <maxVoicesPerEntity value="1"/>
+      <MaxVoices value="1"/>
+      <AudioClip ClipName="#@modfolder:Resources/Sounds.unity3d?33" Loop="false"/>
+    </SoundDataNode>
+    <SoundDataNode name="boombox_music_track34">
+      <AudioSource name="#@modfolder:Resources/boombox.unity3d?AudioSource_Boombox"/>
+      <Noise ID="3" noise="1000" time="5" muffled_when_crouched="0.65" heat_map_strength="10" heat_map_time="1000"/>
+      <MaxRepeatRate value="0.0"/>
+      <LocalCrouchVolumeScale value="1.0"/>
+      <CrouchNoiseScale value="0.5"/>
+      <maxVoicesPerEntity value="1"/>
+      <MaxVoices value="1"/>
+      <AudioClip ClipName="#@modfolder:Resources/Sounds.unity3d?34" Loop="false"/>
+    </SoundDataNode>
+    <SoundDataNode name="boombox_music_track35">
+      <AudioSource name="#@modfolder:Resources/boombox.unity3d?AudioSource_Boombox"/>
+      <Noise ID="3" noise="1000" time="5" muffled_when_crouched="0.65" heat_map_strength="10" heat_map_time="1000"/>
+      <MaxRepeatRate value="0.0"/>
+      <LocalCrouchVolumeScale value="1.0"/>
+      <CrouchNoiseScale value="0.5"/>
+      <maxVoicesPerEntity value="1"/>
+      <MaxVoices value="1"/>
+      <AudioClip ClipName="#@modfolder:Resources/Sounds.unity3d?35" Loop="false"/>
     </SoundDataNode>
   </append>
 </configs>

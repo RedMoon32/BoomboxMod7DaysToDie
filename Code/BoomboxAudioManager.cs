@@ -11,7 +11,8 @@ namespace Boombox
 {
     public static class BoomboxAudioManager
     {
-        private const string SoundName = "boombox_music";
+    private const string NoiseSoundName = "boombox_music";
+    private const string SoundNodePrefix = "boombox_music_track";
 
         // Clip list is loaded from Config/sounds.xml next to the DLL.
         private static readonly object ClipCacheSyncRoot = new object();
@@ -44,6 +45,7 @@ namespace Boombox
 
         private static readonly Dictionary<Vector3i, Handle> ActiveHandles = new Dictionary<Vector3i, Handle>();
         private static readonly Dictionary<Vector3i, string> ClientStates = new Dictionary<Vector3i, string>();
+        private static readonly Dictionary<Vector3i, ClientPlaybackState> ClientPlaybackCoroutines = new Dictionary<Vector3i, ClientPlaybackState>();
         private static readonly object ClientSyncRoot = new object();
 
         private static readonly Dictionary<Vector3i, BoomboxServerState> ServerStates = new Dictionary<Vector3i, BoomboxServerState>();
@@ -126,8 +128,9 @@ namespace Boombox
 
                 if (!state.IsPlaying)
                 {
+                    var previousClip = state.ClipName;
                     state.ToggleCount++;
-                    state.ClipName = SelectClip(world, position, state.ToggleCount);
+                    state.ClipName = SelectClip(world, position, state.ToggleCount, previousClip);
                     state.IsPlaying = true;
                     shouldPlay = true;
                 }
@@ -200,6 +203,85 @@ namespace Boombox
             gameManager.PickupBlockServer(clrIdx, position, blockValue, playerId, clientInfo?.PlatformId);
         }
 
+        public static void ServerHandleTrackFinished(World world, Vector3i position, ClientInfo clientInfo, string clipName)
+        {
+            if (world == null || !IsServer())
+            {
+                Debug.LogWarning("[Boombox] TrackFinished ignored (world missing or not server)");
+                return;
+            }
+
+            var normalizedClip = clipName ?? string.Empty;
+            BoomboxServerState state;
+            string nextClip = null;
+            var shouldStop = false;
+
+            lock (ServerSyncRoot)
+            {
+                if (!ServerStates.TryGetValue(position, out state) || !state.IsPlaying)
+                {
+                    Debug.LogWarning($"[Boombox] TrackFinished ignored (no active state) clip='{normalizedClip}' pos={position}");
+                    return;
+                }
+
+                var currentClip = state.ClipName ?? string.Empty;
+                if (!string.Equals(currentClip, normalizedClip, StringComparison.Ordinal))
+                {
+                    Debug.LogWarning($"[Boombox] TrackFinished ignored (clip mismatch) expected='{currentClip}' got='{normalizedClip}' pos={position}");
+                    return;
+                }
+
+                state.ToggleCount++;
+                var selected = SelectClip(world, position, state.ToggleCount, currentClip);
+                if (string.IsNullOrEmpty(selected))
+                {
+                    state.IsPlaying = false;
+                    shouldStop = true;
+                    ServerStates.Remove(position);
+                    Debug.Log($"[Boombox] TrackFinished stopping playback pos={position} clip='{normalizedClip}'");
+                }
+                else
+                {
+                    state.ClipName = selected;
+                    nextClip = selected;
+                    Debug.Log($"[Boombox] TrackFinished advancing pos={position} clip='{normalizedClip}' -> next='{nextClip}'");
+                }
+            }
+
+            if (shouldStop)
+            {
+                StopNoiseLoop(state);
+                BroadcastStop(position);
+                if (!GameManager.IsDedicatedServer)
+                {
+                    ClientStop(position);
+                }
+                Debug.Log($"[Boombox] TrackFinished broadcast stop pos={position}");
+                return;
+            }
+
+            if (string.IsNullOrEmpty(nextClip))
+            {
+                Debug.LogWarning($"[Boombox] TrackFinished had no next clip pos={position}");
+                return;
+            }
+
+            BroadcastPlay(position, state);
+            if (!GameManager.IsDedicatedServer)
+            {
+                ClientPlay(position, nextClip);
+            }
+
+            EntityPlayer instigator = null;
+            if (state != null && state.LastActivatorEntityId != -1)
+            {
+                instigator = world?.GetEntity(state.LastActivatorEntityId) as EntityPlayer;
+            }
+
+            Debug.Log($"[Boombox] TrackFinished triggered new playback pos={position} by entity={instigator?.entityId ?? -1}");
+            EmitNoise(world, position, instigator);
+        }
+
         private static void EmitNoise(World world, Vector3i position, EntityPlayer instigator)
         {
             if (world?.aiDirector == null)
@@ -209,7 +291,7 @@ namespace Boombox
 
             try
             {
-                world.aiDirector.NotifyNoise(instigator, ToWorld(position), SoundName, 1f);
+        world.aiDirector.NotifyNoise(instigator, ToWorld(position), NoiseSoundName, 1f);
             }
             catch (Exception ex)
             {
@@ -374,15 +456,15 @@ namespace Boombox
                     var path = Path.Combine(assemblyDirectory, "Config", "sounds.xml");
                     if (File.Exists(path))
                     {
-                        var doc = XDocument.Load(path);
-                        var clipNames = doc
-                            .Descendants("SoundDataNode")
-                            .Where(node => string.Equals((string)node.Attribute("name"), SoundName, StringComparison.OrdinalIgnoreCase))
-                            .Elements("AudioClip")
-                            .Select(element => (string)element.Attribute("ClipName"))
-                            .Where(name => !string.IsNullOrEmpty(name))
-                            .Distinct()
-                            .ToArray();
+                var doc = XDocument.Load(path);
+                var clipNames = doc
+                    .Descendants("SoundDataNode")
+                    .Select(node => (string)node.Attribute("name"))
+                    .Where(name => !string.IsNullOrEmpty(name) &&
+                                   name.StartsWith(SoundNodePrefix, StringComparison.OrdinalIgnoreCase))
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .OrderBy(name => name, StringComparer.OrdinalIgnoreCase)
+                    .ToArray();
 
                         if (clipNames.Length > 0)
                         {
@@ -399,7 +481,7 @@ namespace Boombox
             return Array.Empty<string>();
         }
 
-        private static string SelectClip(World world, Vector3i position, int toggleIndex)
+        private static string SelectClip(World world, Vector3i position, int toggleIndex, string previousClip)
         {
             var clipNames = ClipNames;
             if (clipNames.Length == 0)
@@ -407,10 +489,23 @@ namespace Boombox
                 return string.Empty;
             }
 
+            var pool = clipNames;
+            if (!string.IsNullOrEmpty(previousClip) && pool.Length > 1)
+            {
+                pool = clipNames
+                    .Where(name => !string.Equals(name, previousClip, StringComparison.Ordinal))
+                    .ToArray();
+
+                if (pool.Length == 0)
+                {
+                    pool = clipNames;
+                }
+            }
+
             lock (RandomSyncRoot)
             {
-                var index = Random.Next(clipNames.Length);
-                return clipNames[index];
+                var index = Random.Next(pool.Length);
+                return pool[index];
             }
         }
 
@@ -434,10 +529,7 @@ namespace Boombox
                 return;
             }
 
-            lock (ClientSyncRoot)
-            {
-                ClientPlayInternal(position, clipName);
-            }
+            ClientPlayInternal(position, clipName ?? string.Empty);
         }
 
         public static void ClientSync(IEnumerable<BoomboxStateSnapshot> states)
@@ -447,18 +539,16 @@ namespace Boombox
                 return;
             }
 
-            lock (ClientSyncRoot)
-            {
-                StopAllInternal();
-                if (states == null)
-                {
-                    return;
-                }
+            StopAll();
 
-                foreach (var entry in states)
-                {
-                    ClientPlayInternal(entry.Position, entry.ClipName);
-                }
+            if (states == null)
+            {
+                return;
+            }
+
+            foreach (var entry in states)
+            {
+                ClientPlay(entry.Position, entry.ClipName);
             }
         }
 
@@ -469,10 +559,7 @@ namespace Boombox
                 return;
             }
 
-            lock (ClientSyncRoot)
-            {
-                StopInternal(position);
-            }
+            StopInternal(position);
         }
 
         public static void StopAll()
@@ -490,35 +577,317 @@ namespace Boombox
 
         private static void ClientPlayInternal(Vector3i position, string clipName)
         {
-            StopInternal(position);
-            ClientStates[position] = clipName ?? string.Empty;
+            var normalizedClip = clipName ?? string.Empty;
+            var gameManager = GameManager.Instance;
 
-            var handle = Manager.Play(ToWorld(position), SoundName, -1, true);
-            ActiveHandles[position] = handle;
+            lock (ClientSyncRoot)
+            {
+                StopInternalLocked(position, gameManager);
+
+                if (string.IsNullOrEmpty(normalizedClip))
+                {
+                    normalizedClip = ClipNames.FirstOrDefault() ?? string.Empty;
+                }
+
+                if (string.IsNullOrEmpty(normalizedClip))
+                {
+                    Debug.LogWarning("[Boombox] ClientPlayInternal aborted (no clip name available)");
+                    return;
+                }
+
+                ClientStates[position] = normalizedClip;
+                var handle = Manager.Play(ToWorld(position), normalizedClip, -1, true);
+                ActiveHandles[position] = handle;
+
+                RegisterClientMonitorLocked(position, normalizedClip, handle, gameManager);
+            }
         }
 
         private static void StopAllInternal()
         {
+            var gameManager = GameManager.Instance;
+
             foreach (var kvp in ActiveHandles)
             {
                 StopHandle(kvp.Value);
-                Manager.Stop(ToWorld(kvp.Key), SoundName);
+                Manager.Stop(ToWorld(kvp.Key), ResolveSoundNameForPosition(kvp.Key));
             }
 
             ActiveHandles.Clear();
             ClientStates.Clear();
+            StopAllClientMonitorsLocked(gameManager);
         }
 
         private static void StopInternal(Vector3i position)
         {
+            var gameManager = GameManager.Instance;
+            lock (ClientSyncRoot)
+            {
+                StopInternalLocked(position, gameManager);
+            }
+        }
+
+        private static void StopInternalLocked(Vector3i position, GameManager gameManager)
+        {
+            StopClientMonitorLocked(position, gameManager);
+
             if (ActiveHandles.TryGetValue(position, out var handle))
             {
                 ActiveHandles.Remove(position);
                 StopHandle(handle);
-                Manager.Stop(ToWorld(position), SoundName);
+                Manager.Stop(ToWorld(position), ResolveSoundNameForPosition(position));
             }
 
             ClientStates.Remove(position);
+        }
+
+        private static string ResolveSoundNameForPosition(Vector3i position)
+        {
+            if (ClientStates.TryGetValue(position, out var clipName) && !string.IsNullOrEmpty(clipName))
+            {
+                return clipName;
+            }
+
+            var fallback = ClipNames.FirstOrDefault(name => !string.IsNullOrEmpty(name));
+            return fallback ?? NoiseSoundName;
+        }
+
+        private static void RegisterClientMonitorLocked(Vector3i position, string clipName, Handle handle, GameManager gameManager)
+        {
+            if (GameManager.IsDedicatedServer || gameManager == null)
+            {
+                Debug.LogWarning("[Boombox] Client monitor skipped (server or no game manager)");
+                return;
+            }
+
+            var token = 1;
+            if (ClientPlaybackCoroutines.TryGetValue(position, out var existing) && existing != null)
+            {
+                if (existing.Coroutine != null)
+                {
+                    gameManager.StopCoroutine(existing.Coroutine);
+                }
+
+                token = existing.Token + 1;
+            }
+
+            var state = new ClientPlaybackState { Token = token };
+            state.Coroutine = gameManager.StartCoroutine(ClientTrackMonitorRoutine(position, clipName, handle, token));
+            ClientPlaybackCoroutines[position] = state;
+            Debug.Log($"[Boombox] Client monitor started pos={position} clip='{clipName}' token={token}");
+        }
+
+        private static void StopClientMonitorLocked(Vector3i position, GameManager gameManager)
+        {
+            if (!ClientPlaybackCoroutines.TryGetValue(position, out var state) || state == null)
+            {
+                return;
+            }
+
+            if (gameManager != null && state.Coroutine != null)
+            {
+                gameManager.StopCoroutine(state.Coroutine);
+            }
+
+            ClientPlaybackCoroutines.Remove(position);
+        }
+
+        private static void StopAllClientMonitorsLocked(GameManager gameManager)
+        {
+            if (ClientPlaybackCoroutines.Count == 0)
+            {
+                return;
+            }
+
+            foreach (var state in ClientPlaybackCoroutines.Values)
+            {
+                if (state == null)
+                {
+                    continue;
+                }
+
+                if (gameManager != null && state.Coroutine != null)
+                {
+                    gameManager.StopCoroutine(state.Coroutine);
+                }
+            }
+
+            ClientPlaybackCoroutines.Clear();
+        }
+
+        private static IEnumerator ClientTrackMonitorRoutine(Vector3i position, string clipName, Handle handle, int token)
+        {
+            const float clipResolveTimeout = 2f;
+            const float fallbackDuration = 30f;
+            var normalizedClip = clipName ?? string.Empty;
+            Debug.Log($"[Boombox] Client monitor routine running pos={position} clip='{normalizedClip}' token={token}");
+
+            var elapsed = 0f;
+            AudioClip resolvedClip = null;
+            while (elapsed < clipResolveTimeout)
+            {
+                if (!IsMonitorTokenCurrent(position, token) || !IsClipStillActive(position, normalizedClip))
+                {
+                    Debug.Log($"[Boombox] Client monitor exit during resolve pos={position} clip='{normalizedClip}' token={token}");
+                    yield break;
+                }
+
+                resolvedClip = GetClipFromHandle(handle);
+                if (resolvedClip != null)
+                {
+                    Debug.Log($"[Boombox] Client monitor resolved clip length={resolvedClip.length:0.00}s pos={position} token={token}");
+                    break;
+                }
+
+                elapsed += Time.deltaTime;
+                yield return null;
+            }
+
+            var waitDuration = resolvedClip != null && resolvedClip.length > 0f ? resolvedClip.length : fallbackDuration;
+            var waitTimer = 0f;
+            Debug.Log($"[Boombox] Client monitor waiting duration={waitDuration:0.00}s pos={position} clip='{normalizedClip}' token={token}");
+            while (waitTimer < waitDuration)
+            {
+                if (!IsMonitorTokenCurrent(position, token) || !IsClipStillActive(position, normalizedClip))
+                {
+                    Debug.Log($"[Boombox] Client monitor exit during playback wait pos={position} clip='{normalizedClip}' token={token}");
+                    yield break;
+                }
+
+                waitTimer += Time.deltaTime;
+                yield return null;
+            }
+
+            var extraTimer = 0f;
+            const float maxExtra = 5f;
+            while (extraTimer < maxExtra)
+            {
+                if (!IsMonitorTokenCurrent(position, token) || !IsClipStillActive(position, normalizedClip))
+                {
+                    Debug.Log($"[Boombox] Client monitor exit during extra wait pos={position} clip='{normalizedClip}' token={token}");
+                    yield break;
+                }
+
+                if (!IsHandlePlaying(handle))
+                {
+                    Debug.Log($"[Boombox] Client monitor detected handle stopped pos={position} clip='{normalizedClip}' token={token}");
+                    break;
+                }
+
+                extraTimer += Time.deltaTime;
+                yield return null;
+            }
+
+            if (!IsMonitorTokenCurrent(position, token) || !IsClipStillActive(position, normalizedClip))
+            {
+                Debug.Log($"[Boombox] Client monitor exit before notify pos={position} clip='{normalizedClip}' token={token}");
+                yield break;
+            }
+
+            lock (ClientSyncRoot)
+            {
+                if (!ClientPlaybackCoroutines.TryGetValue(position, out var state) || state == null || state.Token != token)
+                {
+                    Debug.Log($"[Boombox] Client monitor missing state at notify pos={position} clip='{normalizedClip}' token={token}");
+                    yield break;
+                }
+
+                ClientPlaybackCoroutines.Remove(position);
+            }
+
+            SendTrackFinishedToServer(position, normalizedClip);
+        }
+
+        private static bool IsClipStillActive(Vector3i position, string clipName)
+        {
+            lock (ClientSyncRoot)
+            {
+                return ClientStates.TryGetValue(position, out var activeClip) &&
+                       string.Equals(activeClip ?? string.Empty, clipName ?? string.Empty, StringComparison.Ordinal);
+            }
+        }
+
+        private static bool IsMonitorTokenCurrent(Vector3i position, int token)
+        {
+            lock (ClientSyncRoot)
+            {
+                return ClientPlaybackCoroutines.TryGetValue(position, out var state) && state != null && state.Token == token;
+            }
+        }
+
+        private static AudioClip GetClipFromHandle(Handle handle)
+        {
+            try
+            {
+                if (handle?.nearSource != null && handle.nearSource.clip != null)
+                {
+                    return handle.nearSource.clip;
+                }
+
+                if (handle?.farSource != null && handle.farSource.clip != null)
+                {
+                    return handle.farSource.clip;
+                }
+            }
+            catch (MissingReferenceException)
+            {
+                // ignored
+            }
+            catch (NullReferenceException)
+            {
+                // ignored
+            }
+
+            return null;
+        }
+
+        private static bool IsHandlePlaying(Handle handle)
+        {
+            try
+            {
+                if (handle?.nearSource != null && handle.nearSource.isPlaying)
+                {
+                    return true;
+                }
+
+                if (handle?.farSource != null && handle.farSource.isPlaying)
+                {
+                    return true;
+                }
+            }
+            catch (MissingReferenceException)
+            {
+                // ignored
+            }
+            catch (NullReferenceException)
+            {
+                // ignored
+            }
+
+            return false;
+        }
+
+        private static void SendTrackFinishedToServer(Vector3i position, string clipName)
+        {
+            if (GameManager.IsDedicatedServer)
+            {
+                Debug.LogWarning("[Boombox] SendTrackFinished ignored on server instance");
+                return;
+            }
+
+            var connection = SingletonMonoBehaviour<ConnectionManager>.Instance;
+            if (connection == null)
+            {
+                Debug.LogWarning("[Boombox] SendTrackFinished failed (no connection manager)");
+                return;
+            }
+
+            var package = NetPackageManager
+                .GetPackage<NetPackageBoomboxTrackFinished>()
+                .Setup(position, clipName ?? string.Empty);
+
+            connection.SendToServer(package, false);
+            Debug.Log($"[Boombox] SendTrackFinished sent pos={position} clip='{clipName}'");
         }
 
         private static void StopHandle(Handle handle)
@@ -556,6 +925,12 @@ namespace Boombox
             {
                 UnityEngine.Object.Destroy(gameObject);
             }
+        }
+
+        private sealed class ClientPlaybackState
+        {
+            public Coroutine Coroutine;
+            public int Token;
         }
 
         public readonly struct BoomboxStateSnapshot
