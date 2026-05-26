@@ -4,6 +4,7 @@
     <block name="boomboxBlock">
       <property name="Extends" value="speaker" />
       <property name="Class" value="Boombox.BlockBoombox, Boombox" />
+      <property name="IndexName" value="boomboxBlock"/>
       <property name="PlaySound" value="alarm1"/>
       <property name="RequiredPower" value="5"/>
       <property name="UnlockedBy" value="craftingElectrician"/>

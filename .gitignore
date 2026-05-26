@@ -1,4 +1,6 @@
 Resources/Sounds.unity3d
+Cache/
+*.wav
 
 # Build outputs and IDE caches in Code/
 Code/bin/

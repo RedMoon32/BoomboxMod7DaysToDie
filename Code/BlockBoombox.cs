@@ -13,7 +13,20 @@ namespace Boombox
 
         public override BlockValue OnBlockPlaced(WorldBase world, int clrIdx, Vector3i blockPos, BlockValue blockValue, GameRandom random)
         {
+            RegisterBlock(world, blockPos);
             return base.OnBlockPlaced(world, clrIdx, blockPos, blockValue, random);
+        }
+
+        public override void OnBlockLoaded(WorldBase world, int clrIdx, Vector3i blockPos, BlockValue blockValue)
+        {
+            RegisterBlock(world, blockPos);
+            base.OnBlockLoaded(world, clrIdx, blockPos, blockValue);
+        }
+
+        public override void OnBlockAdded(WorldBase world, Chunk chunk, Vector3i blockPos, BlockValue blockValue, PlatformUserIdentifierAbs addedByPlayer)
+        {
+            RegisterBlock(world, blockPos);
+            base.OnBlockAdded(world, chunk, blockPos, blockValue, addedByPlayer);
         }
 
         // public override void OnBlockUnloaded(WorldBase world, int clrIdx, Vector3i blockPos, BlockValue blockValue)
@@ -81,6 +94,8 @@ namespace Boombox
                 return;
             }
 
+            RegisterBlock(worldBase, blockPos);
+
             var wantsPickup = player != null && player.Crouching;
             var world = worldBase as World;
             var connection = SingletonMonoBehaviour<ConnectionManager>.Instance;
@@ -106,6 +121,8 @@ namespace Boombox
                 return;
             }
 
+            BoomboxAudioManager.UnregisterBoombox(blockPos);
+
             if (IsClient)
             {
                 BoomboxAudioManager.ClientStop(blockPos);
@@ -114,6 +131,19 @@ namespace Boombox
             if (IsServer && worldBase is World world)
             {
                 BoomboxAudioManager.ServerHandleBlockRemoved(world, blockPos);
+            }
+        }
+
+        private static void RegisterBlock(WorldBase worldBase, Vector3i blockPos)
+        {
+            if (worldBase == null)
+            {
+                return;
+            }
+
+            if (IsServer && worldBase is World world)
+            {
+                BoomboxAudioManager.RegisterBoombox(world, blockPos);
             }
         }
     }

@@ -27,6 +27,12 @@ namespace Boombox
             ModEvents.GameStartDone.RegisterHandler(OnGameStartDone);
             ModEvents.WorldShuttingDown.RegisterHandler(OnWorldShuttingDown);
             ModEvents.PlayerSpawnedInWorld.RegisterHandler(OnPlayerSpawnedInWorld);
+            ModEvents.ChatMessage.RegisterHandler(OnChatMessage);
+        }
+
+        private static ModEvents.EModEventResult OnChatMessage(ref ModEvents.SChatMessageData data)
+        {
+            return BoomboxRuntimeSongManager.ServerHandleChatMessage(ref data);
         }
 
         private static void OnGameStartDone(ref ModEvents.SGameStartDoneData data)

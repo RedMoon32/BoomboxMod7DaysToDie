@@ -50,6 +50,7 @@ namespace Boombox
 
         private static readonly Dictionary<Vector3i, BoomboxServerState> ServerStates = new Dictionary<Vector3i, BoomboxServerState>();
         private static readonly object ServerSyncRoot = new object();
+        private static readonly HashSet<Vector3i> KnownBoomboxPositions = new HashSet<Vector3i>();
 
         private static bool IsClient => !GameManager.IsDedicatedServer;
 
@@ -62,6 +63,77 @@ namespace Boombox
         }
 
         public static IReadOnlyList<string> AvailableClips => ClipNames;
+
+        public static void RegisterBoombox(World world, Vector3i position)
+        {
+            if (world == null || !IsServer())
+            {
+                return;
+            }
+
+            lock (ServerSyncRoot)
+            {
+                KnownBoomboxPositions.Add(position);
+            }
+        }
+
+        public static void UnregisterBoombox(Vector3i position)
+        {
+            lock (ServerSyncRoot)
+            {
+                KnownBoomboxPositions.Remove(position);
+            }
+        }
+
+        public static List<Vector3i> GetKnownBoomboxPositions(World world)
+        {
+            var result = new HashSet<Vector3i>();
+
+            lock (ServerSyncRoot)
+            {
+                foreach (var position in KnownBoomboxPositions)
+                {
+                    if (IsBoomboxAt(world, position))
+                    {
+                        result.Add(position);
+                    }
+                }
+            }
+
+            try
+            {
+                var indexed = world?.ChunkCache?.GetIndexedBlocks("boomboxBlock");
+                if (indexed != null)
+                {
+                    foreach (var position in indexed)
+                    {
+                        if (IsBoomboxAt(world, position))
+                        {
+                            result.Add(position);
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.LogWarning($"[Boombox] Failed to scan indexed boombox blocks: {ex}");
+            }
+
+            return result.ToList();
+        }
+
+        private static bool IsBoomboxAt(World world, Vector3i position)
+        {
+            try
+            {
+                var block = world?.GetBlock(position).Block;
+                return block != null && string.Equals(block.GetBlockName(), "boomboxBlock", StringComparison.Ordinal);
+            }
+            catch (Exception)
+            {
+                return false;
+            }
+        }
 
         public static void ServerInitialize()
         {
@@ -79,6 +151,7 @@ namespace Boombox
                 }
 
                 ServerStates.Clear();
+                KnownBoomboxPositions.Clear();
             }
         }
 
@@ -532,6 +605,19 @@ namespace Boombox
             ClientPlayInternal(position, clipName ?? string.Empty);
         }
 
+        public static void ClientPlayRuntime(IEnumerable<Vector3i> positions, string soundGroupName)
+        {
+            if (!IsClient || positions == null)
+            {
+                return;
+            }
+
+            foreach (var position in positions)
+            {
+                ClientPlayInternal(position, soundGroupName ?? string.Empty, false);
+            }
+        }
+
         public static void ClientSync(IEnumerable<BoomboxStateSnapshot> states)
         {
             if (!IsClient)
@@ -575,7 +661,7 @@ namespace Boombox
             }
         }
 
-        private static void ClientPlayInternal(Vector3i position, string clipName)
+        private static void ClientPlayInternal(Vector3i position, string clipName, bool notifyServerOnFinished = true)
         {
             var normalizedClip = clipName ?? string.Empty;
             var gameManager = GameManager.Instance;
@@ -599,7 +685,10 @@ namespace Boombox
                 var handle = Manager.Play(ToWorld(position), normalizedClip, -1, true);
                 ActiveHandles[position] = handle;
 
-                RegisterClientMonitorLocked(position, normalizedClip, handle, gameManager);
+                if (notifyServerOnFinished)
+                {
+                    RegisterClientMonitorLocked(position, normalizedClip, handle, gameManager);
+                }
             }
         }
 
