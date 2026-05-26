@@ -1,6 +1,10 @@
 Resources/Sounds.unity3d
 Cache/
+packages/
+YtdlpLocalTest/
+YtdlpDownloads/
 *.wav
+*.mp3
 
 # Build outputs and IDE caches in Code/
 Code/bin/
