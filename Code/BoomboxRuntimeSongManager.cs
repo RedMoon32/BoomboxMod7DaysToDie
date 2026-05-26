@@ -17,6 +17,7 @@ namespace Boombox
     {
         private const string ChatPrefix = "PLAY ";
         private const string YoutubeChatPrefix = "PLAYU ";
+        private const string VolumeChatPrefix = "BVOL ";
         private const int ChunkSize = 32 * 1024;
         private const int ChunksPerFrame = 6;
         private const int YoutubeDownloadTimeoutSeconds = 300;
@@ -27,6 +28,11 @@ namespace Boombox
         public static ModEvents.EModEventResult ServerHandleChatMessage(ref ModEvents.SChatMessageData data)
         {
             var message = data.Message ?? string.Empty;
+            if (message.StartsWith(VolumeChatPrefix, StringComparison.OrdinalIgnoreCase))
+            {
+                return ServerHandleVolumeChatMessage(message.Substring(VolumeChatPrefix.Length).Trim());
+            }
+
             if (message.StartsWith(YoutubeChatPrefix, StringComparison.OrdinalIgnoreCase))
             {
                 return ServerHandleYoutubeChatMessage(message.Substring(YoutubeChatPrefix.Length).Trim());
@@ -71,6 +77,23 @@ namespace Boombox
             }
 
             gameManager.StartCoroutine(ServerTransferSongRoutine(songPath, normalizedName, positions));
+            return ModEvents.EModEventResult.StopHandlersAndVanilla;
+        }
+
+        private static ModEvents.EModEventResult ServerHandleVolumeChatMessage(string value)
+        {
+            if (!IsServer())
+            {
+                return ModEvents.EModEventResult.StopHandlersAndVanilla;
+            }
+
+            if (!TryParseVolume(value, out var volume))
+            {
+                Debug.LogWarning($"[Boombox] BVOL ignored (expected 0..5 or 0..500): '{value}'");
+                return ModEvents.EModEventResult.StopHandlersAndVanilla;
+            }
+
+            BoomboxAudioManager.ServerSetVolume(volume);
             return ModEvents.EModEventResult.StopHandlersAndVanilla;
         }
 
@@ -563,6 +586,34 @@ namespace Boombox
             }
 
             return AudioType.UNKNOWN;
+        }
+
+        private static bool TryParseVolume(string value, out float volume)
+        {
+            volume = 1f;
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                return false;
+            }
+
+            var normalized = value.Trim().Replace(',', '.');
+            if (!float.TryParse(normalized, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var parsed))
+            {
+                return false;
+            }
+
+            if (parsed > 5f && parsed <= 500f)
+            {
+                parsed /= 100f;
+            }
+
+            if (parsed < 0f || parsed > 5f)
+            {
+                return false;
+            }
+
+            volume = parsed;
+            return true;
         }
 
         private static string BuildYoutubeDownloadArguments(string query, string toolsDir, string downloadDir, string outputTemplate)

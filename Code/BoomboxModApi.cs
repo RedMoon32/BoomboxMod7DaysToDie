@@ -78,6 +78,7 @@ namespace Boombox
 
             if (IsServer && data.ClientInfo != null)
             {
+                BoomboxAudioManager.ServerSyncVolumeClient(data.ClientInfo);
                 //BoomboxAudioManager.ServerSyncClient(data.ClientInfo);
             }
         }

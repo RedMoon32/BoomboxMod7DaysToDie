@@ -11,8 +11,9 @@ namespace Boombox
 {
     public static class BoomboxAudioManager
     {
-    private const string NoiseSoundName = "boombox_music";
-    private const string SoundNodePrefix = "boombox_music_track";
+        private const string NoiseSoundName = "boombox_music";
+        private const string SoundNodePrefix = "boombox_music_track";
+        private const float MaxVolumeMultiplier = 5f;
 
         // Clip list is loaded from Config/sounds.xml next to the DLL.
         private static readonly object ClipCacheSyncRoot = new object();
@@ -44,6 +45,7 @@ namespace Boombox
         }
 
         private static readonly Dictionary<Vector3i, Handle> ActiveHandles = new Dictionary<Vector3i, Handle>();
+        private static readonly Dictionary<Vector3i, HandleVolumes> ActiveHandleBaseVolumes = new Dictionary<Vector3i, HandleVolumes>();
         private static readonly Dictionary<Vector3i, string> ClientStates = new Dictionary<Vector3i, string>();
         private static readonly Dictionary<Vector3i, ClientPlaybackState> ClientPlaybackCoroutines = new Dictionary<Vector3i, ClientPlaybackState>();
         private static readonly object ClientSyncRoot = new object();
@@ -51,6 +53,8 @@ namespace Boombox
         private static readonly Dictionary<Vector3i, BoomboxServerState> ServerStates = new Dictionary<Vector3i, BoomboxServerState>();
         private static readonly object ServerSyncRoot = new object();
         private static readonly HashSet<Vector3i> KnownBoomboxPositions = new HashSet<Vector3i>();
+        private static float ServerVolume = 1f;
+        private static float ClientVolume = 1f;
 
         private static bool IsClient => !GameManager.IsDedicatedServer;
 
@@ -500,6 +504,46 @@ namespace Boombox
             client.SendPackage(package);
         }
 
+        public static void ServerSyncVolumeClient(ClientInfo client)
+        {
+            if (client == null || !IsServer())
+            {
+                return;
+            }
+
+            float volume;
+            lock (ServerSyncRoot)
+            {
+                volume = ServerVolume;
+            }
+
+            client.SendPackage(NetPackageManager.GetPackage<NetPackageBoomboxVolume>().Setup(volume));
+        }
+
+        public static void ServerSetVolume(float volume)
+        {
+            if (!IsServer())
+            {
+                return;
+            }
+
+            var normalizedVolume = Mathf.Clamp(volume, 0f, MaxVolumeMultiplier);
+            lock (ServerSyncRoot)
+            {
+                ServerVolume = normalizedVolume;
+            }
+
+            var package = NetPackageManager.GetPackage<NetPackageBoomboxVolume>().Setup(normalizedVolume);
+            SingletonMonoBehaviour<ConnectionManager>.Instance?.SendPackage(package, false, -1, -1, -1, null, -1, false);
+
+            if (!GameManager.IsDedicatedServer)
+            {
+                ClientSetVolume(normalizedVolume);
+            }
+
+            Debug.Log($"[Boombox] Volume set to {normalizedVolume:0.00}");
+        }
+
         private static void BroadcastPlay(Vector3i position, BoomboxServerState state)
         {
             var package = NetPackageManager
@@ -684,12 +728,38 @@ namespace Boombox
                 ClientStates[position] = normalizedClip;
                 var handle = Manager.Play(ToWorld(position), normalizedClip, -1, true);
                 ActiveHandles[position] = handle;
+                ActiveHandleBaseVolumes[position] = CaptureHandleVolumes(handle);
+                ApplyVolumeToHandle(handle, ActiveHandleBaseVolumes[position], ClientVolume);
 
                 if (notifyServerOnFinished)
                 {
                     RegisterClientMonitorLocked(position, normalizedClip, handle, gameManager);
                 }
             }
+        }
+
+        public static void ClientSetVolume(float volume)
+        {
+            if (!IsClient)
+            {
+                return;
+            }
+
+            lock (ClientSyncRoot)
+            {
+                ClientVolume = Mathf.Clamp(volume, 0f, MaxVolumeMultiplier);
+                foreach (var entry in ActiveHandles)
+                {
+                    var baseVolumes = ActiveHandleBaseVolumes.TryGetValue(entry.Key, out var volumes)
+                        ? volumes
+                        : CaptureHandleVolumes(entry.Value);
+
+                    ActiveHandleBaseVolumes[entry.Key] = baseVolumes;
+                    ApplyVolumeToHandle(entry.Value, baseVolumes, ClientVolume);
+                }
+            }
+
+            Debug.Log($"[Boombox] Client volume set to {ClientVolume:0.00}");
         }
 
         private static void StopAllInternal()
@@ -703,6 +773,7 @@ namespace Boombox
             }
 
             ActiveHandles.Clear();
+            ActiveHandleBaseVolumes.Clear();
             ClientStates.Clear();
             StopAllClientMonitorsLocked(gameManager);
         }
@@ -723,6 +794,7 @@ namespace Boombox
             if (ActiveHandles.TryGetValue(position, out var handle))
             {
                 ActiveHandles.Remove(position);
+                ActiveHandleBaseVolumes.Remove(position);
                 StopHandle(handle);
                 Manager.Stop(ToWorld(position), ResolveSoundNameForPosition(position));
             }
@@ -956,6 +1028,58 @@ namespace Boombox
             return false;
         }
 
+        private static HandleVolumes CaptureHandleVolumes(Handle handle)
+        {
+            return new HandleVolumes
+            {
+                NearVolume = GetSourceVolume(handle?.nearSource),
+                FarVolume = GetSourceVolume(handle?.farSource)
+            };
+        }
+
+        private static float GetSourceVolume(AudioSource source)
+        {
+            try
+            {
+                return source != null ? source.volume : 1f;
+            }
+            catch (MissingReferenceException)
+            {
+                return 1f;
+            }
+            catch (NullReferenceException)
+            {
+                return 1f;
+            }
+        }
+
+        private static void ApplyVolumeToHandle(Handle handle, HandleVolumes baseVolumes, float volume)
+        {
+            try
+            {
+                ApplyVolumeToSource(handle?.nearSource, baseVolumes.NearVolume, volume);
+                ApplyVolumeToSource(handle?.farSource, baseVolumes.FarVolume, volume);
+            }
+            catch (MissingReferenceException)
+            {
+                // ignored
+            }
+            catch (NullReferenceException)
+            {
+                // ignored
+            }
+        }
+
+        private static void ApplyVolumeToSource(AudioSource source, float baseVolume, float volume)
+        {
+            if (source == null)
+            {
+                return;
+            }
+
+            source.volume = Mathf.Clamp(baseVolume * volume, 0f, MaxVolumeMultiplier);
+        }
+
         private static void SendTrackFinishedToServer(Vector3i position, string clipName)
         {
             if (GameManager.IsDedicatedServer)
@@ -1020,6 +1144,12 @@ namespace Boombox
         {
             public Coroutine Coroutine;
             public int Token;
+        }
+
+        private struct HandleVolumes
+        {
+            public float NearVolume;
+            public float FarVolume;
         }
 
         public readonly struct BoomboxStateSnapshot
