@@ -3,9 +3,10 @@ using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Xml.Linq;
+using System.Security.Cryptography;
 using Audio;
 using UnityEngine;
+using UnityEngine.Networking;
 
 namespace Boombox
 {
@@ -13,11 +14,15 @@ namespace Boombox
     {
         private const string NoiseSoundName = "boombox_music";
         private const string SoundNodePrefix = "boombox_music_track";
+        private const string LocalMusicSoundPrefix = "boombox_music_file_";
         private const float MaxVolumeMultiplier = 5f;
+        private static readonly string[] SupportedLocalMusicExtensions = { ".mp3", ".wav" };
 
-        // Clip list is loaded from Config/sounds.xml next to the DLL.
+        // Clip list is discovered from Resources/MusicToPlay next to the DLL.
         private static readonly object ClipCacheSyncRoot = new object();
         private static string[] cachedClipNames;
+        private static Dictionary<string, LocalMusicTrack> cachedLocalMusicTracks;
+        private static readonly HashSet<string> RegisteredLocalMusicGroups = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
         private static readonly object RandomSyncRoot = new object();
         private static readonly System.Random Random = new System.Random();
@@ -36,7 +41,10 @@ namespace Boombox
                 {
                     if (cachedClipNames == null)
                     {
-                        cachedClipNames = LoadClipNamesFromConfig();
+                        cachedLocalMusicTracks = LoadLocalMusicTracks();
+                        cachedClipNames = cachedLocalMusicTracks.Keys
+                            .OrderBy(name => name, StringComparer.OrdinalIgnoreCase)
+                            .ToArray();
                     }
 
                     return cachedClipNames;
@@ -562,40 +570,44 @@ namespace Boombox
             SingletonMonoBehaviour<ConnectionManager>.Instance.SendPackage(package, false, -1, -1, -1, null, -1, false);
         }
 
-        private static string[] LoadClipNamesFromConfig()
+        private static Dictionary<string, LocalMusicTrack> LoadLocalMusicTracks()
         {
+            var tracks = new Dictionary<string, LocalMusicTrack>(StringComparer.OrdinalIgnoreCase);
+
             try
             {
-                var assemblyPath = typeof(BoomboxAudioManager).Assembly.Location;
-                if (!string.IsNullOrEmpty(assemblyPath))
+                var musicDirectory = GetLocalMusicDirectory();
+                if (!Directory.Exists(musicDirectory))
                 {
-                    var assemblyDirectory = Path.GetDirectoryName(assemblyPath) ?? string.Empty;
-                    var path = Path.Combine(assemblyDirectory, "Config", "sounds.xml");
-                    if (File.Exists(path))
-                    {
-                var doc = XDocument.Load(path);
-                var clipNames = doc
-                    .Descendants("SoundDataNode")
-                    .Select(node => (string)node.Attribute("name"))
-                    .Where(name => !string.IsNullOrEmpty(name) &&
-                                   name.StartsWith(SoundNodePrefix, StringComparison.OrdinalIgnoreCase))
-                    .Distinct(StringComparer.OrdinalIgnoreCase)
-                    .OrderBy(name => name, StringComparer.OrdinalIgnoreCase)
-                    .ToArray();
+                    Directory.CreateDirectory(musicDirectory);
+                    Debug.Log($"[Boombox] Created local music directory: {musicDirectory}");
+                    return tracks;
+                }
 
-                        if (clipNames.Length > 0)
-                        {
-                            return clipNames;
-                        }
+                foreach (var filePath in Directory.GetFiles(musicDirectory, "*.*", SearchOption.TopDirectoryOnly))
+                {
+                    var extension = Path.GetExtension(filePath).ToLowerInvariant();
+                    if (!SupportedLocalMusicExtensions.Contains(extension))
+                    {
+                        continue;
+                    }
+
+                    var fileName = Path.GetFileName(filePath);
+                    var soundGroupName = LocalMusicSoundPrefix + ComputeStableFileId(fileName);
+                    if (!tracks.ContainsKey(soundGroupName))
+                    {
+                        tracks.Add(soundGroupName, new LocalMusicTrack(soundGroupName, filePath));
                     }
                 }
+
+                Debug.Log($"[Boombox] Local music tracks discovered: {tracks.Count}");
             }
             catch (Exception ex)
             {
-                Debug.LogWarning($"[Boombox] Failed to load clip names from sounds.xml: {ex}");
+                Debug.LogWarning($"[Boombox] Failed to load local music tracks: {ex}");
             }
 
-            return Array.Empty<string>();
+            return tracks;
         }
 
         private static string SelectClip(World world, Vector3i position, int toggleIndex, string previousClip)
@@ -726,6 +738,20 @@ namespace Boombox
                 }
 
                 ClientStates[position] = normalizedClip;
+
+                if (IsLocalMusicClip(normalizedClip) && !IsLocalMusicGroupRegistered(normalizedClip))
+                {
+                    if (gameManager == null)
+                    {
+                        Debug.LogWarning($"[Boombox] Local music playback skipped (game manager missing) clip='{normalizedClip}'");
+                        ClientStates.Remove(position);
+                        return;
+                    }
+
+                    gameManager.StartCoroutine(ClientLoadLocalMusicAndPlayRoutine(position, normalizedClip, notifyServerOnFinished));
+                    return;
+                }
+
                 var handle = Manager.Play(ToWorld(position), normalizedClip, -1, true);
                 ActiveHandles[position] = handle;
                 ActiveHandleBaseVolumes[position] = CaptureHandleVolumes(handle);
@@ -734,6 +760,70 @@ namespace Boombox
                 if (notifyServerOnFinished)
                 {
                     RegisterClientMonitorLocked(position, normalizedClip, handle, gameManager);
+                }
+            }
+        }
+
+        private static IEnumerator ClientLoadLocalMusicAndPlayRoutine(Vector3i position, string soundGroupName, bool notifyServerOnFinished)
+        {
+            if (!TryGetLocalMusicTrack(soundGroupName, out var track))
+            {
+                Debug.LogWarning($"[Boombox] Local music track missing clip='{soundGroupName}'");
+                yield break;
+            }
+
+            var audioType = GetAudioType(track.Extension);
+            if (audioType == AudioType.UNKNOWN)
+            {
+                Debug.LogWarning($"[Boombox] Unsupported local music extension '{track.Extension}' path='{track.FilePath}'");
+                yield break;
+            }
+
+            var uri = new Uri(track.FilePath).AbsoluteUri;
+            using (var request = UnityWebRequestMultimedia.GetAudioClip(uri, audioType))
+            {
+                var handler = request.downloadHandler as DownloadHandlerAudioClip;
+                if (handler != null)
+                {
+                    handler.streamAudio = false;
+                    handler.compressed = false;
+                }
+
+                yield return request.SendWebRequest();
+
+                if (request.result != UnityWebRequest.Result.Success)
+                {
+                    Debug.LogError($"[Boombox] Failed to load local music '{track.FilePath}': {request.error}");
+                    yield break;
+                }
+
+                var clip = DownloadHandlerAudioClip.GetContent(request);
+                if (clip == null)
+                {
+                    Debug.LogError($"[Boombox] Local music decoded to null clip '{track.FilePath}'");
+                    yield break;
+                }
+
+                RegisterLocalMusicSound(track, clip);
+            }
+
+            lock (ClientSyncRoot)
+            {
+                if (!ClientStates.TryGetValue(position, out var activeClip) ||
+                    !string.Equals(activeClip, soundGroupName, StringComparison.OrdinalIgnoreCase))
+                {
+                    yield break;
+                }
+
+                var gameManager = GameManager.Instance;
+                var handle = Manager.Play(ToWorld(position), soundGroupName, -1, true);
+                ActiveHandles[position] = handle;
+                ActiveHandleBaseVolumes[position] = CaptureHandleVolumes(handle);
+                ApplyVolumeToHandle(handle, ActiveHandleBaseVolumes[position], ClientVolume);
+
+                if (notifyServerOnFinished)
+                {
+                    RegisterClientMonitorLocked(position, soundGroupName, handle, gameManager);
                 }
             }
         }
@@ -811,6 +901,77 @@ namespace Boombox
 
             var fallback = ClipNames.FirstOrDefault(name => !string.IsNullOrEmpty(name));
             return fallback ?? NoiseSoundName;
+        }
+
+        private static bool IsLocalMusicClip(string soundGroupName)
+        {
+            return !string.IsNullOrEmpty(soundGroupName) &&
+                   soundGroupName.StartsWith(LocalMusicSoundPrefix, StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static bool TryGetLocalMusicTrack(string soundGroupName, out LocalMusicTrack track)
+        {
+            lock (ClipCacheSyncRoot)
+            {
+                if (cachedLocalMusicTracks == null)
+                {
+                    cachedLocalMusicTracks = LoadLocalMusicTracks();
+                    cachedClipNames = cachedLocalMusicTracks.Keys
+                        .OrderBy(name => name, StringComparer.OrdinalIgnoreCase)
+                        .ToArray();
+                }
+
+                return cachedLocalMusicTracks.TryGetValue(soundGroupName ?? string.Empty, out track);
+            }
+        }
+
+        private static bool IsLocalMusicGroupRegistered(string soundGroupName)
+        {
+            return RegisteredLocalMusicGroups.Contains(soundGroupName) ||
+                   Manager.audioData != null && Manager.audioData.ContainsKey(soundGroupName);
+        }
+
+        private static void RegisterLocalMusicSound(LocalMusicTrack track, AudioClip clip)
+        {
+            if (track == null || clip == null)
+            {
+                return;
+            }
+
+            var clipName = track.SoundGroupName + "_clip";
+            Manager.audioClipAssetCache[clipName] = clip;
+
+            if (Manager.audioData == null)
+            {
+                Manager.Init();
+            }
+
+            if (RegisteredLocalMusicGroups.Contains(track.SoundGroupName) ||
+                Manager.audioData.ContainsKey(track.SoundGroupName))
+            {
+                return;
+            }
+
+            var xmlData = new XmlData
+            {
+                soundGroupName = track.SoundGroupName,
+                maxRepeatRate = 0f,
+                maxVoices = 1,
+                maxVoicesPerEntity = 1,
+                localCrouchVolumeScale = 1f,
+                crouchNoiseScale = 0.5f
+            };
+
+            xmlData.audioClipMap.Add(new ClipSourceMap
+            {
+                clipName = clipName,
+                audioSourceName = GetAudioSourceName(),
+                forceLoop = false
+            });
+
+            Manager.AddAudioData(xmlData);
+            RegisteredLocalMusicGroups.Add(track.SoundGroupName);
+            Debug.Log($"[Boombox] Local music registered group='{track.SoundGroupName}' file='{Path.GetFileName(track.FilePath)}'");
         }
 
         private static void RegisterClientMonitorLocked(Vector3i position, string clipName, Handle handle, GameManager gameManager)
@@ -1002,6 +1163,107 @@ namespace Boombox
             return null;
         }
 
+        private static AudioType GetAudioType(string extension)
+        {
+            var ext = (extension ?? string.Empty).ToLowerInvariant();
+            if (ext == ".wav")
+            {
+                return AudioType.WAV;
+            }
+
+            if (ext == ".mp3")
+            {
+                return AudioType.MPEG;
+            }
+
+            return AudioType.UNKNOWN;
+        }
+
+        private static string GetLocalMusicDirectory()
+        {
+            return Path.Combine(GetModRootDirectory(), "Resources", "MusicToPlay");
+        }
+
+        private static string GetModRootDirectory()
+        {
+            var assemblyPath = typeof(BoomboxAudioManager).Assembly.Location;
+            var assemblyDirectory = Path.GetDirectoryName(assemblyPath) ?? string.Empty;
+            if (File.Exists(Path.Combine(assemblyDirectory, "ModInfo.xml")))
+            {
+                return assemblyDirectory;
+            }
+
+            var parent = Directory.GetParent(assemblyDirectory)?.FullName;
+            if (!string.IsNullOrEmpty(parent) && File.Exists(Path.Combine(parent, "ModInfo.xml")))
+            {
+                return parent;
+            }
+
+            return assemblyDirectory;
+        }
+
+        private static string ComputeStableFileId(string value)
+        {
+            using (var sha = SHA1.Create())
+            {
+                var bytes = System.Text.Encoding.UTF8.GetBytes((value ?? string.Empty).ToLowerInvariant());
+                return BitConverter.ToString(sha.ComputeHash(bytes)).Replace("-", string.Empty).ToLowerInvariant();
+            }
+        }
+
+        private static string GetAudioSourceName()
+        {
+            var existingSource = GetExistingBoomboxAudioSourceName();
+            if (!string.IsNullOrEmpty(existingSource))
+            {
+                return existingSource;
+            }
+
+            var bundlePath = Path.Combine(GetModRootDirectory(), "Resources", "boombox.unity3d").Replace('\\', '/');
+            return "#" + bundlePath + "?AudioSource_Boombox";
+        }
+
+        private static string GetExistingBoomboxAudioSourceName()
+        {
+            try
+            {
+                if (Manager.audioData == null)
+                {
+                    return string.Empty;
+                }
+
+                foreach (var entry in Manager.audioData)
+                {
+                    if (entry.Value == null ||
+                        string.IsNullOrEmpty(entry.Key) ||
+                        !entry.Key.StartsWith(SoundNodePrefix, StringComparison.OrdinalIgnoreCase))
+                    {
+                        continue;
+                    }
+
+                    var clips = entry.Value.GetClipList();
+                    if (clips == null)
+                    {
+                        continue;
+                    }
+
+                    foreach (var clip in clips)
+                    {
+                        if (clip != null && !string.IsNullOrEmpty(clip.audioSourceName))
+                        {
+                            return clip.audioSourceName;
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.LogWarning($"[Boombox] Failed to resolve existing boombox audio source: {ex}");
+            }
+
+            return string.Empty;
+        }
+
         private static bool IsHandlePlaying(Handle handle)
         {
             try
@@ -1150,6 +1412,20 @@ namespace Boombox
         {
             public float NearVolume;
             public float FarVolume;
+        }
+
+        private sealed class LocalMusicTrack
+        {
+            public LocalMusicTrack(string soundGroupName, string filePath)
+            {
+                SoundGroupName = soundGroupName ?? string.Empty;
+                FilePath = filePath ?? string.Empty;
+                Extension = Path.GetExtension(FilePath).ToLowerInvariant();
+            }
+
+            public string SoundGroupName { get; }
+            public string FilePath { get; }
+            public string Extension { get; }
         }
 
         public readonly struct BoomboxStateSnapshot

@@ -574,7 +574,7 @@ namespace Boombox
 
         private static IMusicDownloader CreateDefaultMusicDownloader()
         {
-            return new YtDlpMusicDownloader(GetModRootDirectory());
+            return new HitmozMusicDownloader(GetModRootDirectory());
         }
 
         private static string Truncate(string value, int maxLength)
