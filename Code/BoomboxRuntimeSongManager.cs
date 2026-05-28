@@ -19,13 +19,17 @@ namespace Boombox
         private const string VolumeChatPrefix = "BVOL ";
         private const string SearchChatPrefix = "SEARCH ";
         private const string PlayNumberChatPrefix = "PLAYNUM ";
+        private const string PreDelayChatPrefix = "SETPREDELAY ";
         private const int ChunkSize = 32 * 1024;
         private const int ChunksPerFrame = 6;
         private const int SearchResultLimit = 10;
+        private const float DefaultPreDelaySeconds = 2f;
+        private const float MaxPreDelaySeconds = 30f;
 
         private static readonly Dictionary<string, ClientTransfer> ClientTransfers = new Dictionary<string, ClientTransfer>();
         private static readonly HashSet<string> RegisteredSoundGroups = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         private static readonly Dictionary<string, SearchSession> SearchSessions = new Dictionary<string, SearchSession>();
+        private static float ServerPreDelaySeconds = DefaultPreDelaySeconds;
 
         public static ModEvents.EModEventResult ServerHandleChatMessage(ref ModEvents.SChatMessageData data)
         {
@@ -38,6 +42,11 @@ namespace Boombox
             if (message.StartsWith(SearchChatPrefix, StringComparison.OrdinalIgnoreCase))
             {
                 return ServerHandleSearchChatMessage(message.Substring(SearchChatPrefix.Length).Trim(), ref data);
+            }
+
+            if (message.StartsWith(PreDelayChatPrefix, StringComparison.OrdinalIgnoreCase))
+            {
+                return ServerHandlePreDelayChatMessage(message.Substring(PreDelayChatPrefix.Length).Trim(), ref data);
             }
 
             if (message.StartsWith(PlayNumberChatPrefix, StringComparison.OrdinalIgnoreCase))
@@ -90,6 +99,25 @@ namespace Boombox
             }
 
             BoomboxAudioManager.ServerSetVolume(volume);
+            return ModEvents.EModEventResult.StopHandlersAndVanilla;
+        }
+
+        private static ModEvents.EModEventResult ServerHandlePreDelayChatMessage(string value, ref ModEvents.SChatMessageData data)
+        {
+            if (!IsServer())
+            {
+                return ModEvents.EModEventResult.StopHandlersAndVanilla;
+            }
+
+            if (!TryParseSeconds(value, out var seconds))
+            {
+                SendChatReply(data.ClientInfo, $"Usage: SETPREDELAY <seconds 0..{MaxPreDelaySeconds:0}>");
+                return ModEvents.EModEventResult.StopHandlersAndVanilla;
+            }
+
+            ServerPreDelaySeconds = seconds;
+            SendChatReply(data.ClientInfo, $"Runtime song pre-delay set to {ServerPreDelaySeconds:0.##}s");
+            Debug.Log($"[Boombox] Runtime song pre-delay set to {ServerPreDelaySeconds:0.##}s");
             return ModEvents.EModEventResult.StopHandlersAndVanilla;
         }
 
@@ -313,17 +341,18 @@ namespace Boombox
                 }
             }
 
+            var scheduledStartUtcTicks = DateTime.UtcNow.AddSeconds(ServerPreDelaySeconds).Ticks;
             var complete = NetPackageManager
                 .GetPackage<NetPackageBoomboxSongComplete>()
-                .Setup(songId);
+                .Setup(songId, scheduledStartUtcTicks);
 
             BroadcastToClients(complete);
             if (!GameManager.IsDedicatedServer)
             {
-                ClientReceiveSongComplete(songId);
+                ClientReceiveSongComplete(songId, scheduledStartUtcTicks);
             }
 
-            Debug.Log($"[Boombox] Runtime song transfer queued song='{songName}' bytes={bytes.Length} chunks={chunkIndex} positions={positions.Count}");
+            Debug.Log($"[Boombox] Runtime song transfer queued song='{songName}' bytes={bytes.Length} chunks={chunkIndex} positions={positions.Count} preDelay={ServerPreDelaySeconds:0.##}s");
         }
 
         public static void ClientReceiveSongStart(string songId, string songName, string extension, long totalBytes, List<Vector3i> positions)
@@ -383,7 +412,7 @@ namespace Boombox
             }
         }
 
-        public static void ClientReceiveSongComplete(string songId)
+        public static void ClientReceiveSongComplete(string songId, long scheduledStartUtcTicks)
         {
             if (GameManager.IsDedicatedServer || string.IsNullOrEmpty(songId))
             {
@@ -414,6 +443,7 @@ namespace Boombox
                 }
 
                 File.Move(transfer.TempPath, transfer.FinalPath);
+                transfer.ScheduledStartUtcTicks = scheduledStartUtcTicks;
                 ClientTransfers.Remove(songId);
 
                 var gameManager = GameManager.Instance;
@@ -464,8 +494,16 @@ namespace Boombox
                 }
 
                 var soundGroupName = RegisterRuntimeSound(transfer.SongId, clip);
-                BoomboxAudioManager.ClientPlayRuntime(transfer.Positions, soundGroupName);
-                Debug.Log($"[Boombox] Runtime song playing group='{soundGroupName}' positions={transfer.Positions.Count} length={clip.length:0.00}s");
+                var secondsUntilStart = GetSecondsUntilUtcTicks(transfer.ScheduledStartUtcTicks);
+                if (secondsUntilStart > 0f)
+                {
+                    Debug.Log($"[Boombox] Runtime song waiting {secondsUntilStart:0.00}s before playback group='{soundGroupName}'");
+                    yield return new WaitForSeconds(secondsUntilStart);
+                }
+
+                var offsetSeconds = Mathf.Clamp(-GetSecondsUntilUtcTicks(transfer.ScheduledStartUtcTicks), 0f, Math.Max(0f, clip.length - 0.1f));
+                BoomboxAudioManager.ClientPlayRuntime(transfer.Positions, soundGroupName, offsetSeconds);
+                Debug.Log($"[Boombox] Runtime song playing group='{soundGroupName}' positions={transfer.Positions.Count} length={clip.length:0.00}s offset={offsetSeconds:0.00}s");
             }
         }
 
@@ -684,6 +722,40 @@ namespace Boombox
             return true;
         }
 
+        private static bool TryParseSeconds(string value, out float seconds)
+        {
+            seconds = DefaultPreDelaySeconds;
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                return false;
+            }
+
+            var normalized = value.Trim().Replace(',', '.');
+            if (!float.TryParse(normalized, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var parsed))
+            {
+                return false;
+            }
+
+            if (parsed < 0f || parsed > MaxPreDelaySeconds)
+            {
+                return false;
+            }
+
+            seconds = parsed;
+            return true;
+        }
+
+        private static float GetSecondsUntilUtcTicks(long utcTicks)
+        {
+            if (utcTicks <= 0)
+            {
+                return 0f;
+            }
+
+            var delta = new DateTime(utcTicks, DateTimeKind.Utc) - DateTime.UtcNow;
+            return (float)delta.TotalSeconds;
+        }
+
         private static IMusicDownloader CreateDefaultMusicDownloader()
         {
             return new HitmozMusicDownloader(GetModRootDirectory());
@@ -784,6 +856,7 @@ namespace Boombox
             public long ReceivedBytes;
             public string FinalPath;
             public string TempPath;
+            public long ScheduledStartUtcTicks;
             public List<Vector3i> Positions;
             public FileStream Stream;
         }

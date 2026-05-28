@@ -663,6 +663,11 @@ namespace Boombox
 
         public static void ClientPlayRuntime(IEnumerable<Vector3i> positions, string soundGroupName)
         {
+            ClientPlayRuntime(positions, soundGroupName, 0f);
+        }
+
+        public static void ClientPlayRuntime(IEnumerable<Vector3i> positions, string soundGroupName, float startOffsetSeconds)
+        {
             if (!IsClient || positions == null)
             {
                 return;
@@ -670,7 +675,7 @@ namespace Boombox
 
             foreach (var position in positions)
             {
-                ClientPlayInternal(position, soundGroupName ?? string.Empty, false);
+                ClientPlayInternal(position, soundGroupName ?? string.Empty, false, startOffsetSeconds);
             }
         }
 
@@ -717,7 +722,7 @@ namespace Boombox
             }
         }
 
-        private static void ClientPlayInternal(Vector3i position, string clipName, bool notifyServerOnFinished = true)
+        private static void ClientPlayInternal(Vector3i position, string clipName, bool notifyServerOnFinished = true, float startOffsetSeconds = 0f)
         {
             var normalizedClip = clipName ?? string.Empty;
             var gameManager = GameManager.Instance;
@@ -753,6 +758,7 @@ namespace Boombox
                 }
 
                 var handle = Manager.Play(ToWorld(position), normalizedClip, -1, true);
+                ApplyStartOffset(handle, startOffsetSeconds);
                 ActiveHandles[position] = handle;
                 ActiveHandleBaseVolumes[position] = CaptureHandleVolumes(handle);
                 ApplyVolumeToHandle(handle, ActiveHandleBaseVolumes[position], ClientVolume);
@@ -817,6 +823,7 @@ namespace Boombox
 
                 var gameManager = GameManager.Instance;
                 var handle = Manager.Play(ToWorld(position), soundGroupName, -1, true);
+                ApplyStartOffset(handle, 0f);
                 ActiveHandles[position] = handle;
                 ActiveHandleBaseVolumes[position] = CaptureHandleVolumes(handle);
                 ApplyVolumeToHandle(handle, ActiveHandleBaseVolumes[position], ClientVolume);
@@ -1288,6 +1295,34 @@ namespace Boombox
             }
 
             return false;
+        }
+
+        private static void ApplyStartOffset(Handle handle, float offsetSeconds)
+        {
+            if (handle == null || offsetSeconds <= 0f)
+            {
+                return;
+            }
+
+            ApplyStartOffset(handle.nearSource, offsetSeconds);
+            ApplyStartOffset(handle.farSource, offsetSeconds);
+        }
+
+        private static void ApplyStartOffset(AudioSource source, float offsetSeconds)
+        {
+            try
+            {
+                if (source == null || source.clip == null)
+                {
+                    return;
+                }
+
+                source.time = Mathf.Clamp(offsetSeconds, 0f, Math.Max(0f, source.clip.length - 0.1f));
+            }
+            catch (Exception ex)
+            {
+                Debug.LogWarning($"[Boombox] Failed to apply audio start offset: {ex.Message}");
+            }
         }
 
         private static HandleVolumes CaptureHandleVolumes(Handle handle)

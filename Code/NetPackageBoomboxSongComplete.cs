@@ -8,10 +8,12 @@ namespace Boombox
         private static readonly Encoding Utf8 = Encoding.UTF8;
 
         private string _songId = string.Empty;
+        private long _scheduledStartUtcTicks;
 
-        public NetPackageBoomboxSongComplete Setup(string songId)
+        public NetPackageBoomboxSongComplete Setup(string songId, long scheduledStartUtcTicks)
         {
             _songId = songId ?? string.Empty;
+            _scheduledStartUtcTicks = scheduledStartUtcTicks;
             return this;
         }
 
@@ -19,13 +21,14 @@ namespace Boombox
 
         public override int GetLength()
         {
-            return sizeof(int) + Utf8.GetByteCount(_songId ?? string.Empty);
+            return sizeof(int) + Utf8.GetByteCount(_songId ?? string.Empty) + sizeof(long);
         }
 
         public override void read(PooledBinaryReader reader)
         {
             var length = reader.ReadInt32();
             _songId = length > 0 ? Utf8.GetString(reader.ReadBytes(length)) : string.Empty;
+            _scheduledStartUtcTicks = reader.ReadInt64();
         }
 
         public override void write(PooledBinaryWriter writer)
@@ -38,11 +41,13 @@ namespace Boombox
             {
                 binaryWriter.BaseStream.Write(bytes, 0, bytes.Length);
             }
+
+            binaryWriter.Write(_scheduledStartUtcTicks);
         }
 
         public override void ProcessPackage(World world, GameManager callbacks)
         {
-            BoomboxRuntimeSongManager.ClientReceiveSongComplete(_songId);
+            BoomboxRuntimeSongManager.ClientReceiveSongComplete(_songId, _scheduledStartUtcTicks);
         }
     }
 }
