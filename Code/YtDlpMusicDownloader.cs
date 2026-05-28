@@ -23,6 +23,12 @@ namespace Boombox
 
         public string Name => "yt-dlp";
 
+        public IEnumerator SearchByQuery(string query, int limit, MusicSearchResult result)
+        {
+            result?.Fail(-1, "yt-dlp search listing is not implemented", string.Empty);
+            yield break;
+        }
+
         public IEnumerator DownloadByQuery(string query, MusicDownloadResult result)
         {
             if (result == null)
@@ -79,6 +85,12 @@ namespace Boombox
             }
 
             result.Complete(mp3Path, attempt.Output);
+        }
+
+        public IEnumerator DownloadSearchResult(MusicSearchItem item, MusicDownloadResult result)
+        {
+            result?.Fail(-1, "yt-dlp numbered search playback is not implemented", string.Empty);
+            yield break;
         }
 
         private IEnumerator RunDownloadAttempt(

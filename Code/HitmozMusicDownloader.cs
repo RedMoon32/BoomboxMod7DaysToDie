@@ -2,6 +2,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Net;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -34,6 +35,14 @@ namespace Boombox
             "<div\\b(?=[^>]*\\btrack__desc\\b)[^>]*>(?<text>.*?)</div>",
             RegexOptions.IgnoreCase | RegexOptions.Singleline | RegexOptions.Compiled);
 
+        private static readonly Regex DurationRegex = new Regex(
+            "<div\\b(?=[^>]*\\btrack__fulltime\\b)[^>]*>(?<text>.*?)</div>",
+            RegexOptions.IgnoreCase | RegexOptions.Singleline | RegexOptions.Compiled);
+
+        private static readonly Regex TrackIdRegex = new Regex(
+            "<span\\b(?=[^>]*\\btrack__like-btn\\b)[^>]*\\bdata-track-id\\s*=\\s*(?:\"(?<id>[^\"]+)\"|'(?<id>[^']+)'|(?<id>[^\\s>]+))",
+            RegexOptions.IgnoreCase | RegexOptions.Singleline | RegexOptions.Compiled);
+
         private readonly string _modRoot;
 
         public HitmozMusicDownloader(string modRoot)
@@ -42,6 +51,41 @@ namespace Boombox
         }
 
         public string Name => "hitmoz";
+
+        public IEnumerator SearchByQuery(string query, int limit, MusicSearchResult result)
+        {
+            if (result == null)
+            {
+                yield break;
+            }
+
+            if (string.IsNullOrWhiteSpace(query))
+            {
+                result.Fail(-1, "empty query", string.Empty);
+                yield break;
+            }
+
+            var task = Task.Run(() => SearchByQuerySync(query, limit));
+            while (!task.IsCompleted)
+            {
+                yield return null;
+            }
+
+            if (task.IsFaulted)
+            {
+                result.Fail(-1, task.Exception?.GetBaseException().Message ?? "search failed", task.Exception?.ToString() ?? string.Empty);
+                yield break;
+            }
+
+            var taskResult = task.Result;
+            if (!taskResult.Success)
+            {
+                result.Fail(taskResult.ExitCode, taskResult.Error, taskResult.DiagnosticOutput);
+                yield break;
+            }
+
+            result.Complete(taskResult.Items, taskResult.DiagnosticOutput);
+        }
 
         public IEnumerator DownloadByQuery(string query, MusicDownloadResult result)
         {
@@ -86,6 +130,76 @@ namespace Boombox
             result.Complete(taskResult.FilePath, taskResult.DiagnosticOutput);
         }
 
+        public IEnumerator DownloadSearchResult(MusicSearchItem item, MusicDownloadResult result)
+        {
+            if (result == null)
+            {
+                yield break;
+            }
+
+            if (item == null || string.IsNullOrWhiteSpace(item.DownloadPath))
+            {
+                result.Fail(-1, "empty search result", string.Empty);
+                yield break;
+            }
+
+            var progress = new DownloadProgress();
+            var task = Task.Run(() => DownloadSearchItemSync(item, progress));
+            var lastStage = string.Empty;
+            var lastProgressBucket = -1;
+
+            while (!task.IsCompleted)
+            {
+                LogProgress(item.DisplayName, progress, ref lastStage, ref lastProgressBucket);
+                yield return null;
+            }
+
+            LogProgress(item.DisplayName, progress, ref lastStage, ref lastProgressBucket);
+
+            if (task.IsFaulted)
+            {
+                result.Fail(-1, task.Exception?.GetBaseException().Message ?? "download failed", task.Exception?.ToString() ?? string.Empty);
+                yield break;
+            }
+
+            var taskResult = task.Result;
+            if (!taskResult.Success)
+            {
+                result.Fail(taskResult.ExitCode, taskResult.Error, taskResult.DiagnosticOutput);
+                yield break;
+            }
+
+            Debug.Log($"[Boombox] Hitmoz download finished selection='{item.DisplayName}' file='{Path.GetFileName(taskResult.FilePath)}'");
+            result.Complete(taskResult.FilePath, taskResult.DiagnosticOutput);
+        }
+
+        private MusicSearchResult SearchByQuerySync(string query, int limit)
+        {
+            var result = new MusicSearchResult();
+            try
+            {
+                var pageHtml = FetchSearchPage(query);
+                var items = ParseTracks(pageHtml)
+                    .Take(Math.Max(1, limit))
+                    .Select(track => track.ToSearchItem(Name))
+                    .ToArray();
+
+                if (items.Length == 0)
+                {
+                    result.Fail(1, "no tracks found", string.Empty);
+                    return result;
+                }
+
+                result.Complete(items, $"found: {items.Length}");
+                return result;
+            }
+            catch (Exception ex)
+            {
+                result.Fail(1, ex.Message, ex.ToString());
+                return result;
+            }
+        }
+
         private MusicDownloadResult DownloadByQuerySync(string query, DownloadProgress progress)
         {
             var result = new MusicDownloadResult();
@@ -101,23 +215,42 @@ namespace Boombox
                     return result;
                 }
 
-                var track = tracks[0];
-                progress.SetSelectedTrack(track.DisplayName, tracks.Count);
-                var outputDir = Path.Combine(_modRoot, "HitmozDownloads", "audio");
-                Directory.CreateDirectory(outputDir);
-
-                var fileName = "hitmoz_" + DateTime.UtcNow.ToString("yyyyMMdd_HHmmss") + "_" + Guid.NewGuid().ToString("N").Substring(0, 8) + ".mp3";
-                var filePath = Path.Combine(outputDir, fileName);
-                DownloadTrack(track, filePath, progress);
-
-                result.Complete(filePath, $"selected: {track.DisplayName}");
-                return result;
+                return DownloadTrackSync(tracks[0], tracks.Count, progress);
             }
             catch (Exception ex)
             {
                 result.Fail(1, ex.Message, ex.ToString());
                 return result;
             }
+        }
+
+        private MusicDownloadResult DownloadSearchItemSync(MusicSearchItem item, DownloadProgress progress)
+        {
+            try
+            {
+                return DownloadTrackSync(HitmozTrack.FromSearchItem(item), 1, progress);
+            }
+            catch (Exception ex)
+            {
+                var result = new MusicDownloadResult();
+                result.Fail(1, ex.Message, ex.ToString());
+                return result;
+            }
+        }
+
+        private MusicDownloadResult DownloadTrackSync(HitmozTrack track, int trackCount, DownloadProgress progress)
+        {
+            var result = new MusicDownloadResult();
+            progress.SetSelectedTrack(track.DisplayName, trackCount);
+            var outputDir = Path.Combine(_modRoot, "HitmozDownloads", "audio");
+            Directory.CreateDirectory(outputDir);
+
+            var fileName = "hitmoz_" + DateTime.UtcNow.ToString("yyyyMMdd_HHmmss") + "_" + Guid.NewGuid().ToString("N").Substring(0, 8) + ".mp3";
+            var filePath = Path.Combine(outputDir, fileName);
+            DownloadTrack(track, filePath, progress);
+
+            result.Complete(filePath, $"selected: {track.DisplayName}");
+            return result;
         }
 
         private static string FetchSearchPage(string query)
@@ -159,8 +292,10 @@ namespace Boombox
                 }
 
                 tracks.Add(new HitmozTrack(
+                    WebUtility.HtmlDecode(TrackIdRegex.Match(body).Groups["id"].Value),
                     CleanText(ArtistRegex.Match(body).Groups["text"].Value),
                     CleanText(TitleRegex.Match(body).Groups["text"].Value),
+                    CleanText(DurationRegex.Match(body).Groups["text"].Value),
                     downloadPath));
             }
 
@@ -379,15 +514,19 @@ namespace Boombox
 
         private sealed class HitmozTrack
         {
-            public HitmozTrack(string artist, string title, string downloadPath)
+            public HitmozTrack(string id, string artist, string title, string duration, string downloadPath)
             {
+                Id = id ?? string.Empty;
                 Artist = artist ?? string.Empty;
                 Title = title ?? string.Empty;
+                Duration = duration ?? string.Empty;
                 DownloadPath = downloadPath ?? string.Empty;
             }
 
+            public string Id { get; }
             public string Artist { get; }
             public string Title { get; }
+            public string Duration { get; }
             public string DownloadPath { get; }
 
             public string DisplayName
@@ -401,6 +540,16 @@ namespace Boombox
 
                     return !string.IsNullOrEmpty(Title) ? Title : Artist;
                 }
+            }
+
+            public MusicSearchItem ToSearchItem(string source)
+            {
+                return new MusicSearchItem(source, Id, Title, Artist, Duration, DownloadPath);
+            }
+
+            public static HitmozTrack FromSearchItem(MusicSearchItem item)
+            {
+                return new HitmozTrack(item?.Id, item?.Artist, item?.Title, item?.Duration, item?.DownloadPath);
             }
         }
     }

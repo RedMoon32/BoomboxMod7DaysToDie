@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Security.Cryptography;
+using System.Text;
 using Audio;
 using UnityEngine;
 using UnityEngine.Networking;
@@ -16,11 +17,15 @@ namespace Boombox
         private const string ChatPrefix = "PLAY ";
         private const string YoutubeChatPrefix = "PLAYU ";
         private const string VolumeChatPrefix = "BVOL ";
+        private const string SearchChatPrefix = "SEARCH ";
+        private const string PlayNumberChatPrefix = "PLAYNUM ";
         private const int ChunkSize = 32 * 1024;
         private const int ChunksPerFrame = 6;
+        private const int SearchResultLimit = 10;
 
         private static readonly Dictionary<string, ClientTransfer> ClientTransfers = new Dictionary<string, ClientTransfer>();
         private static readonly HashSet<string> RegisteredSoundGroups = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        private static readonly Dictionary<string, SearchSession> SearchSessions = new Dictionary<string, SearchSession>();
 
         public static ModEvents.EModEventResult ServerHandleChatMessage(ref ModEvents.SChatMessageData data)
         {
@@ -28,6 +33,16 @@ namespace Boombox
             if (message.StartsWith(VolumeChatPrefix, StringComparison.OrdinalIgnoreCase))
             {
                 return ServerHandleVolumeChatMessage(message.Substring(VolumeChatPrefix.Length).Trim());
+            }
+
+            if (message.StartsWith(SearchChatPrefix, StringComparison.OrdinalIgnoreCase))
+            {
+                return ServerHandleSearchChatMessage(message.Substring(SearchChatPrefix.Length).Trim(), ref data);
+            }
+
+            if (message.StartsWith(PlayNumberChatPrefix, StringComparison.OrdinalIgnoreCase))
+            {
+                return ServerHandlePlayNumberChatMessage(message.Substring(PlayNumberChatPrefix.Length).Trim(), ref data);
             }
 
             if (message.StartsWith(YoutubeChatPrefix, StringComparison.OrdinalIgnoreCase))
@@ -75,6 +90,65 @@ namespace Boombox
             }
 
             BoomboxAudioManager.ServerSetVolume(volume);
+            return ModEvents.EModEventResult.StopHandlersAndVanilla;
+        }
+
+        private static ModEvents.EModEventResult ServerHandleSearchChatMessage(string query, ref ModEvents.SChatMessageData data)
+        {
+            if (!IsServer())
+            {
+                return ModEvents.EModEventResult.StopHandlersAndVanilla;
+            }
+
+            if (string.IsNullOrWhiteSpace(query))
+            {
+                SendChatReply(data.ClientInfo, "Usage: SEARCH <query>");
+                return ModEvents.EModEventResult.StopHandlersAndVanilla;
+            }
+
+            var gameManager = GameManager.Instance;
+            if (gameManager == null)
+            {
+                Debug.LogWarning("[Boombox] SEARCH ignored (game manager missing)");
+                return ModEvents.EModEventResult.StopHandlersAndVanilla;
+            }
+
+            gameManager.StartCoroutine(ServerSearchRoutine(query, GetSearchSessionKey(ref data), data.ClientInfo));
+            return ModEvents.EModEventResult.StopHandlersAndVanilla;
+        }
+
+        private static ModEvents.EModEventResult ServerHandlePlayNumberChatMessage(string value, ref ModEvents.SChatMessageData data)
+        {
+            if (!IsServer())
+            {
+                return ModEvents.EModEventResult.StopHandlersAndVanilla;
+            }
+
+            if (!int.TryParse(value.Trim(), out var number) || number < 1)
+            {
+                SendChatReply(data.ClientInfo, "Usage: PLAYNUM <number>");
+                return ModEvents.EModEventResult.StopHandlersAndVanilla;
+            }
+
+            if (!TryGetServerPlaybackContext("PLAYNUM", out var positions, out var gameManager))
+            {
+                return ModEvents.EModEventResult.StopHandlersAndVanilla;
+            }
+
+            var sessionKey = GetSearchSessionKey(ref data);
+            if (!SearchSessions.TryGetValue(sessionKey, out var session) || session.Items.Count == 0)
+            {
+                SendChatReply(data.ClientInfo, "No SEARCH results cached. Use SEARCH <query> first.");
+                return ModEvents.EModEventResult.StopHandlersAndVanilla;
+            }
+
+            if (number > session.Items.Count)
+            {
+                SendChatReply(data.ClientInfo, $"PLAYNUM {number} is out of range. Last SEARCH has {session.Items.Count} result(s).");
+                return ModEvents.EModEventResult.StopHandlersAndVanilla;
+            }
+
+            gameManager.StartCoroutine(ServerDownloadSearchResultAndTransferRoutine(session.Items[number - 1], positions, data.ClientInfo));
             return ModEvents.EModEventResult.StopHandlersAndVanilla;
         }
 
@@ -147,6 +221,44 @@ namespace Boombox
             }
 
             yield return ServerTransferSongRoutine(result.FilePath, query, positions);
+        }
+
+        private static IEnumerator ServerSearchRoutine(string query, string sessionKey, ClientInfo clientInfo)
+        {
+            var downloader = CreateDefaultMusicDownloader();
+            var result = new MusicSearchResult();
+            Debug.Log($"[Boombox] SEARCH started downloader='{downloader.Name}' query='{query}'");
+            SendChatReply(clientInfo, $"Searching {downloader.Name}: {query}");
+
+            yield return downloader.SearchByQuery(query, SearchResultLimit, result);
+
+            if (!result.Success)
+            {
+                Debug.LogWarning($"[Boombox] SEARCH failed downloader='{downloader.Name}' exit={result.ExitCode} query='{query}' error='{result.Error}' output='{Truncate(result.DiagnosticOutput, 1000)}'");
+                SendChatReply(clientInfo, $"Search failed: {result.Error}");
+                yield break;
+            }
+
+            SearchSessions[sessionKey] = new SearchSession(query, downloader.Name, result.Items);
+            SendSearchResults(clientInfo, query, result.Items);
+            Debug.Log($"[Boombox] SEARCH completed downloader='{downloader.Name}' query='{query}' results={result.Items.Count}");
+        }
+
+        private static IEnumerator ServerDownloadSearchResultAndTransferRoutine(MusicSearchItem item, List<Vector3i> positions, ClientInfo clientInfo)
+        {
+            var downloader = CreateMusicDownloader(item.Source);
+            var result = new MusicDownloadResult();
+            SendChatReply(clientInfo, $"Downloading #{item.DisplayName}");
+            yield return downloader.DownloadSearchResult(item, result);
+
+            if (!result.Success)
+            {
+                Debug.LogWarning($"[Boombox] PLAYNUM download failed downloader='{downloader.Name}' exit={result.ExitCode} item='{item.DisplayName}' error='{result.Error}' output='{Truncate(result.DiagnosticOutput, 1000)}'");
+                SendChatReply(clientInfo, $"Download failed: {result.Error}");
+                yield break;
+            }
+
+            yield return ServerTransferSongRoutine(result.FilePath, item.DisplayName, positions);
         }
 
         private static IEnumerator ServerTransferSongRoutine(string songPath, string songName, List<Vector3i> positions)
@@ -577,6 +689,63 @@ namespace Boombox
             return new HitmozMusicDownloader(GetModRootDirectory());
         }
 
+        private static IMusicDownloader CreateMusicDownloader(string source)
+        {
+            if (string.Equals(source, "yt-dlp", StringComparison.OrdinalIgnoreCase))
+            {
+                return new YtDlpMusicDownloader(GetModRootDirectory());
+            }
+
+            return new HitmozMusicDownloader(GetModRootDirectory());
+        }
+
+        private static string GetSearchSessionKey(ref ModEvents.SChatMessageData data)
+        {
+            if (data.ClientInfo != null)
+            {
+                return data.ClientInfo.ToString();
+            }
+
+            return "entity:" + data.SenderEntityId;
+        }
+
+        private static void SendSearchResults(ClientInfo clientInfo, string query, List<MusicSearchItem> items)
+        {
+            if (items == null || items.Count == 0)
+            {
+                SendChatReply(clientInfo, $"No results for: {query}");
+                return;
+            }
+
+            SendChatReply(clientInfo, $"Results for '{query}' ({items.Count}). Use PLAYNUM <n>:");
+            for (var i = 0; i < items.Count; i++)
+            {
+                var item = items[i];
+                var duration = string.IsNullOrEmpty(item.Duration) ? string.Empty : " [" + item.Duration + "]";
+                SendChatReply(clientInfo, $"{i + 1}. {item.DisplayName}{duration}");
+            }
+        }
+
+        private static void SendChatReply(ClientInfo clientInfo, string message)
+        {
+            var text = "[Boombox] " + (message ?? string.Empty);
+            Debug.Log(text);
+
+            if (clientInfo == null)
+            {
+                return;
+            }
+
+            try
+            {
+                clientInfo.SendPackage(NetPackageManager.GetPackage<NetPackageSimpleChat>().Setup(text));
+            }
+            catch (Exception ex)
+            {
+                Debug.LogWarning($"[Boombox] Failed to send chat reply: {ex}");
+            }
+        }
+
         private static string Truncate(string value, int maxLength)
         {
             if (string.IsNullOrEmpty(value) || value.Length <= maxLength)
@@ -617,6 +786,20 @@ namespace Boombox
             public string TempPath;
             public List<Vector3i> Positions;
             public FileStream Stream;
+        }
+
+        private sealed class SearchSession
+        {
+            public SearchSession(string query, string source, IEnumerable<MusicSearchItem> items)
+            {
+                Query = query ?? string.Empty;
+                Source = source ?? string.Empty;
+                Items = items?.ToList() ?? new List<MusicSearchItem>();
+            }
+
+            public string Query { get; }
+            public string Source { get; }
+            public List<MusicSearchItem> Items { get; }
         }
 
     }
