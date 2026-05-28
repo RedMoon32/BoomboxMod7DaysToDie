@@ -1,11 +1,9 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Security.Cryptography;
-using System.Text;
 using Audio;
 using UnityEngine;
 using UnityEngine.Networking;
@@ -20,7 +18,6 @@ namespace Boombox
         private const string VolumeChatPrefix = "BVOL ";
         private const int ChunkSize = 32 * 1024;
         private const int ChunksPerFrame = 6;
-        private const int YoutubeDownloadTimeoutSeconds = 300;
 
         private static readonly Dictionary<string, ClientTransfer> ClientTransfers = new Dictionary<string, ClientTransfer>();
         private static readonly HashSet<string> RegisteredSoundGroups = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -48,31 +45,15 @@ namespace Boombox
                 return ModEvents.EModEventResult.StopHandlersAndVanilla;
             }
 
-            var songName = message.Substring(ChatPrefix.Length).Trim();
-            var world = GameManager.Instance?.World;
-            if (world == null)
+            if (!TryGetServerPlaybackContext("PLAY", out var positions, out var gameManager))
             {
-                Debug.LogWarning("[Boombox] PLAY ignored (world missing)");
                 return ModEvents.EModEventResult.StopHandlersAndVanilla;
             }
 
+            var songName = message.Substring(ChatPrefix.Length).Trim();
             if (!TryResolveSongPath(songName, out var songPath, out var normalizedName))
             {
                 Debug.LogWarning($"[Boombox] PLAY ignored (song not found or invalid): '{songName}'");
-                return ModEvents.EModEventResult.StopHandlersAndVanilla;
-            }
-
-            var positions = BoomboxAudioManager.GetKnownBoomboxPositions(world);
-            if (positions.Count == 0)
-            {
-                Debug.LogWarning($"[Boombox] PLAY ignored (no known boombox positions): '{normalizedName}'");
-                return ModEvents.EModEventResult.StopHandlersAndVanilla;
-            }
-
-            var gameManager = GameManager.Instance;
-            if (gameManager == null)
-            {
-                Debug.LogWarning("[Boombox] PLAY ignored (game manager missing)");
                 return ModEvents.EModEventResult.StopHandlersAndVanilla;
             }
 
@@ -110,87 +91,62 @@ namespace Boombox
                 return ModEvents.EModEventResult.StopHandlersAndVanilla;
             }
 
-            var world = GameManager.Instance?.World;
-            if (world == null)
+            if (!TryGetServerPlaybackContext("PLAYU", out var positions, out var gameManager))
             {
-                Debug.LogWarning("[Boombox] PLAYU ignored (world missing)");
                 return ModEvents.EModEventResult.StopHandlersAndVanilla;
             }
 
-            var positions = BoomboxAudioManager.GetKnownBoomboxPositions(world);
-            if (positions.Count == 0)
-            {
-                Debug.LogWarning($"[Boombox] PLAYU ignored (no known boombox positions): '{query}'");
-                return ModEvents.EModEventResult.StopHandlersAndVanilla;
-            }
-
-            var gameManager = GameManager.Instance;
-            if (gameManager == null)
-            {
-                Debug.LogWarning("[Boombox] PLAYU ignored (game manager missing)");
-                return ModEvents.EModEventResult.StopHandlersAndVanilla;
-            }
-
-            gameManager.StartCoroutine(ServerDownloadYoutubeAndTransferRoutine(query, positions));
+            gameManager.StartCoroutine(ServerDownloadAndTransferRoutine(query, positions));
             return ModEvents.EModEventResult.StopHandlersAndVanilla;
         }
 
-        private static IEnumerator ServerDownloadYoutubeAndTransferRoutine(string query, List<Vector3i> positions)
+        private static bool TryGetServerPlaybackContext(string commandName, out List<Vector3i> positions, out GameManager gameManager)
         {
-            var toolsDir = Path.Combine(GetModRootDirectory(), "YtdlpDownloads", "bin");
-            var ytDlpPath = Path.Combine(toolsDir, "yt-dlp.exe");
-            var ffmpegPath = Path.Combine(toolsDir, "ffmpeg.exe");
-            if (!File.Exists(ytDlpPath) || !File.Exists(ffmpegPath))
+            positions = null;
+            gameManager = null;
+
+            if (!IsServer())
             {
-                Debug.LogWarning($"[Boombox] PLAYU ignored (yt-dlp/ffmpeg missing): '{toolsDir}'");
+                return false;
+            }
+
+            var world = GameManager.Instance?.World;
+            if (world == null)
+            {
+                Debug.LogWarning($"[Boombox] {commandName} ignored (world missing)");
+                return false;
+            }
+
+            positions = BoomboxAudioManager.GetKnownBoomboxPositions(world);
+            if (positions.Count == 0)
+            {
+                Debug.LogWarning($"[Boombox] {commandName} ignored (no known boombox positions)");
+                return false;
+            }
+
+            gameManager = GameManager.Instance;
+            if (gameManager == null)
+            {
+                Debug.LogWarning($"[Boombox] {commandName} ignored (game manager missing)");
+                return false;
+            }
+
+            return true;
+        }
+
+        private static IEnumerator ServerDownloadAndTransferRoutine(string query, List<Vector3i> positions)
+        {
+            var downloader = CreateDefaultMusicDownloader();
+            var result = new MusicDownloadResult();
+            yield return downloader.DownloadByQuery(query, result);
+
+            if (!result.Success)
+            {
+                Debug.LogWarning($"[Boombox] PLAYU download failed downloader='{downloader.Name}' exit={result.ExitCode} query='{query}' error='{result.Error}' output='{Truncate(result.DiagnosticOutput, 2000)}'");
                 yield break;
             }
 
-            var downloadDir = Path.Combine(GetModRootDirectory(), "YtdlpDownloads", "audio");
-            Directory.CreateDirectory(downloadDir);
-
-            var fileBaseName = "playu_" + DateTime.UtcNow.ToString("yyyyMMdd_HHmmss") + "_" + Guid.NewGuid().ToString("N").Substring(0, 8);
-            var outputTemplate = fileBaseName + ".%(ext)s";
-            var arguments = BuildYoutubeDownloadArguments(query, toolsDir, downloadDir, outputTemplate);
-
-            Debug.Log($"[Boombox] PLAYU download queued query='{query}'");
-            var process = StartProcess(ytDlpPath, arguments, out var output);
-            if (process == null)
-            {
-                yield break;
-            }
-
-            var startTime = Time.realtimeSinceStartup;
-            while (!process.HasExited)
-            {
-                if (Time.realtimeSinceStartup - startTime > YoutubeDownloadTimeoutSeconds)
-                {
-                    TryKill(process);
-                    Debug.LogWarning($"[Boombox] PLAYU download timed out query='{query}' output='{Truncate(output.ToString(), 1000)}'");
-                    yield break;
-                }
-
-                yield return null;
-            }
-
-            process.WaitForExit();
-            var exitCode = process.ExitCode;
-            process.Dispose();
-
-            if (exitCode != 0)
-            {
-                Debug.LogWarning($"[Boombox] PLAYU download failed exit={exitCode} query='{query}' output='{Truncate(output.ToString(), 2000)}'");
-                yield break;
-            }
-
-            var mp3Path = Path.Combine(downloadDir, fileBaseName + ".mp3");
-            if (!File.Exists(mp3Path))
-            {
-                Debug.LogWarning($"[Boombox] PLAYU download produced no mp3 query='{query}' output='{Truncate(output.ToString(), 2000)}'");
-                yield break;
-            }
-
-            yield return ServerTransferSongRoutine(mp3Path, query, positions);
+            yield return ServerTransferSongRoutine(result.FilePath, query, positions);
         }
 
         private static IEnumerator ServerTransferSongRoutine(string songPath, string songName, List<Vector3i> positions)
@@ -616,170 +572,9 @@ namespace Boombox
             return true;
         }
 
-        private static string BuildYoutubeDownloadArguments(string query, string toolsDir, string downloadDir, string outputTemplate)
+        private static IMusicDownloader CreateDefaultMusicDownloader()
         {
-            var args = new List<string>
-            {
-                "--js-runtimes",
-                "node",
-                "--ffmpeg-location",
-                toolsDir,
-                "-x",
-                "--audio-format",
-                "mp3",
-                "--audio-quality",
-                "0",
-                "--no-playlist",
-                "--no-part",
-                "--force-overwrites",
-                "-P",
-                downloadDir,
-                "-o",
-                outputTemplate
-            };
-
-            var cookiesPath = GetYoutubeCookiesPath();
-            if (!string.IsNullOrEmpty(cookiesPath))
-            {
-                args.Add("--cookies");
-                args.Add(cookiesPath);
-            }
-
-            args.Add("ytsearch1:" + query);
-            return string.Join(" ", args.Select(QuoteArgument).ToArray());
-        }
-
-        private static string GetYoutubeCookiesPath()
-        {
-            var envPath = Environment.GetEnvironmentVariable("BOOMBOX_YTDLP_COOKIES");
-            if (!string.IsNullOrWhiteSpace(envPath) && File.Exists(envPath))
-            {
-                return envPath;
-            }
-
-            var root = GetModRootDirectory();
-            var candidates = new[]
-            {
-                Path.Combine(root, "YtdlpDownloads", "cookies.txt"),
-                Path.Combine(root, "Cookies", "youtube.txt"),
-                Path.Combine(root, "cookies.txt")
-            };
-
-            foreach (var candidate in candidates)
-            {
-                if (File.Exists(candidate))
-                {
-                    return candidate;
-                }
-            }
-
-            return string.Empty;
-        }
-
-        private static Process StartProcess(string fileName, string arguments, out StringBuilder output)
-        {
-            output = new StringBuilder();
-
-            try
-            {
-                var capturedOutput = output;
-                var process = new Process
-                {
-                    StartInfo = new ProcessStartInfo
-                    {
-                        FileName = fileName,
-                        Arguments = arguments,
-                        UseShellExecute = false,
-                        CreateNoWindow = true,
-                        RedirectStandardOutput = true,
-                        RedirectStandardError = true,
-                        WorkingDirectory = GetModRootDirectory()
-                    },
-                    EnableRaisingEvents = true
-                };
-
-                process.OutputDataReceived += (sender, args) =>
-                {
-                    if (!string.IsNullOrEmpty(args.Data))
-                    {
-                        capturedOutput.AppendLine(args.Data);
-                    }
-                };
-
-                process.ErrorDataReceived += (sender, args) =>
-                {
-                    if (!string.IsNullOrEmpty(args.Data))
-                    {
-                        capturedOutput.AppendLine(args.Data);
-                    }
-                };
-
-                process.Start();
-                process.BeginOutputReadLine();
-                process.BeginErrorReadLine();
-                return process;
-            }
-            catch (Exception ex)
-            {
-                Debug.LogError($"[Boombox] Failed to start process '{fileName}': {ex}");
-                return null;
-            }
-        }
-
-        private static void TryKill(Process process)
-        {
-            try
-            {
-                if (process != null && !process.HasExited)
-                {
-                    process.Kill();
-                }
-            }
-            catch
-            {
-                // ignored
-            }
-            finally
-            {
-                process?.Dispose();
-            }
-        }
-
-        private static string QuoteArgument(string value)
-        {
-            if (string.IsNullOrEmpty(value))
-            {
-                return "\"\"";
-            }
-
-            var result = new StringBuilder();
-            result.Append('"');
-
-            var backslashes = 0;
-            foreach (var ch in value)
-            {
-                if (ch == '\\')
-                {
-                    backslashes++;
-                    continue;
-                }
-
-                if (ch == '"')
-                {
-                    result.Append('\\', backslashes * 2 + 1);
-                    result.Append('"');
-                    backslashes = 0;
-                    continue;
-                }
-
-                result.Append('\\', backslashes);
-                result.Append(ch);
-                backslashes = 0;
-            }
-
-            result.Append('\\', backslashes * 2);
-            result.Append('"');
-            return result.ToString();
+            return new YtDlpMusicDownloader(GetModRootDirectory());
         }
 
         private static string Truncate(string value, int maxLength)
@@ -823,5 +618,6 @@ namespace Boombox
             public List<Vector3i> Positions;
             public FileStream Stream;
         }
+
     }
 }
