@@ -85,6 +85,59 @@ namespace Boombox
             }
         }
 
+        public static bool ServerPlayLocalMusicFile(World world, IEnumerable<Vector3i> positions, string filePath, EntityPlayer instigator)
+        {
+            if (world == null || positions == null || string.IsNullOrEmpty(filePath) || !IsServer())
+            {
+                return false;
+            }
+
+            RefreshLocalMusicLibrary();
+            if (!TryGetLocalMusicTrackByPath(filePath, out var track))
+            {
+                Debug.LogWarning($"[Boombox] ServerPlayLocalMusicFile ignored (track not in local library): '{filePath}'");
+                return false;
+            }
+
+            var statesToPlay = new List<KeyValuePair<Vector3i, BoomboxServerState>>();
+            lock (ServerSyncRoot)
+            {
+                foreach (var position in positions.Distinct())
+                {
+                    if (!IsBoomboxAt(world, position))
+                    {
+                        continue;
+                    }
+
+                    if (!ServerStates.TryGetValue(position, out var state))
+                    {
+                        state = new BoomboxServerState();
+                        ServerStates[position] = state;
+                    }
+
+                    state.ToggleCount++;
+                    state.PlaybackToken++;
+                    state.ClipName = track.SoundGroupName;
+                    state.IsPlaying = true;
+                    statesToPlay.Add(new KeyValuePair<Vector3i, BoomboxServerState>(position, state));
+                }
+            }
+
+            foreach (var entry in statesToPlay)
+            {
+                var usesRuntimeTransfer = BroadcastPlay(entry.Key, entry.Value);
+                if (!usesRuntimeTransfer && !GameManager.IsDedicatedServer)
+                {
+                    ClientPlay(entry.Key, entry.Value.ClipName);
+                }
+
+                EmitNoise(world, entry.Key, instigator);
+                StartNoiseLoop(world, entry.Key, entry.Value, instigator);
+            }
+
+            return statesToPlay.Count > 0;
+        }
+
         public static void RegisterBoombox(World world, Vector3i position)
         {
             if (world == null || !IsServer())
@@ -193,6 +246,8 @@ namespace Boombox
 
                 ServerStates.Clear();
             }
+
+            BoomboxRuntimeSongManager.ClearServerQueue("server shutdown");
         }
 
         public static void ServerHandleToggle(World world, int clrIdx, Vector3i position, ClientInfo clientInfo, EntityPlayer player, bool pickup)
@@ -235,6 +290,7 @@ namespace Boombox
                     state.PlaybackToken++;
                     shouldStop = true;
                     ServerStates.Remove(position);
+                    BoomboxRuntimeSongManager.ClearServerQueue("boombox stopped");
                 }
             }
 
@@ -274,6 +330,7 @@ namespace Boombox
                 if (ServerStates.TryGetValue(position, out previousState))
                 {
                     ServerStates.Remove(position);
+                    BoomboxRuntimeSongManager.ClearServerQueue("boombox picked up");
                 }
             }
 
@@ -328,7 +385,10 @@ namespace Boombox
                 }
 
                 state.ToggleCount++;
-                var selected = SelectClip(world, position, state.ToggleCount, currentClip);
+                var selected = BoomboxRuntimeSongManager.TryDequeueServerQueue(out var queuedPath, out var queuedName) &&
+                               TryGetLocalMusicTrackByPath(queuedPath, out var queuedTrack)
+                    ? queuedTrack.SoundGroupName
+                    : SelectClip(world, position, state.ToggleCount, currentClip);
                 if (string.IsNullOrEmpty(selected))
                 {
                     state.IsPlaying = false;
@@ -342,7 +402,8 @@ namespace Boombox
                     state.PlaybackToken++;
                     state.ClipName = selected;
                     nextClip = selected;
-                    Debug.Log($"[Boombox] TrackFinished advancing pos={position} clip='{normalizedClip}' -> next='{nextClip}'");
+                    var nextLabel = string.IsNullOrEmpty(queuedName) ? nextClip : queuedName;
+                    Debug.Log($"[Boombox] TrackFinished advancing pos={position} clip='{normalizedClip}' -> next='{nextLabel}'");
                 }
             }
 
@@ -480,6 +541,7 @@ namespace Boombox
                 }
 
                 ServerStates.Remove(position);
+                BoomboxRuntimeSongManager.ClearServerQueue("boombox removed");
             }
 
         if (removedState != null)
@@ -1009,6 +1071,33 @@ namespace Boombox
 
                 return cachedLocalMusicTracks.TryGetValue(soundGroupName ?? string.Empty, out track);
             }
+        }
+
+        private static bool TryGetLocalMusicTrackByPath(string filePath, out LocalMusicTrack track)
+        {
+            track = null;
+            var normalizedPath = Path.GetFullPath(filePath ?? string.Empty);
+            lock (ClipCacheSyncRoot)
+            {
+                if (cachedLocalMusicTracks == null)
+                {
+                    cachedLocalMusicTracks = LoadLocalMusicTracks();
+                    cachedClipNames = cachedLocalMusicTracks.Keys
+                        .OrderBy(name => name, StringComparer.OrdinalIgnoreCase)
+                        .ToArray();
+                }
+
+                foreach (var candidate in cachedLocalMusicTracks.Values)
+                {
+                    if (string.Equals(Path.GetFullPath(candidate.FilePath), normalizedPath, StringComparison.OrdinalIgnoreCase))
+                    {
+                        track = candidate;
+                        return true;
+                    }
+                }
+            }
+
+            return false;
         }
 
         private static bool IsLocalMusicGroupRegistered(string soundGroupName)

@@ -1,0 +1,37 @@
+ManifestFileVersion: 0
+UnityVersion: 6000.2.8f1
+CRC: 2763811442
+Hashes:
+  AssetFileHash:
+    serializedVersion: 2
+    Hash: b8ac481cbedfe545005bc9358cc6644b
+  TypeTreeHash:
+    serializedVersion: 2
+    Hash: d2591695c2deb1b483b67d88da9e55d6
+  IncrementalBuildHash:
+    serializedVersion: 2
+    Hash: 30566c96d81b99c934ed7e8d98f86180
+HashAppended: 0
+ClassTypes:
+- Class: 1
+  Script: {instanceID: 0}
+- Class: 4
+  Script: {instanceID: 0}
+- Class: 21
+  Script: {instanceID: 0}
+- Class: 23
+  Script: {instanceID: 0}
+- Class: 28
+  Script: {instanceID: 0}
+- Class: 33
+  Script: {instanceID: 0}
+- Class: 43
+  Script: {instanceID: 0}
+- Class: 48
+  Script: {instanceID: 0}
+- Class: 65
+  Script: {instanceID: 0}
+SerializeReferenceClassIdentifiers: []
+Assets:
+- Assets/BoomboxPrefab.prefab
+Dependencies: []

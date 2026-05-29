@@ -19,6 +19,8 @@ namespace Boombox
         private const string VolumeChatPrefix = "BVOL ";
         private const string SearchChatPrefix = "SEARCH ";
         private const string PlayNumberChatPrefix = "PLAYNUM ";
+        private const string QueueAddChatPrefix = "QUEUEADD ";
+        private const string QueueAddNumberChatPrefix = "QUEUEADDNUM ";
         private const string PreDelayChatPrefix = "SETPREDELAY ";
         private const int ChunkSize = 32 * 1024;
         private const int ChunksPerFrame = 6;
@@ -29,6 +31,8 @@ namespace Boombox
         private static readonly Dictionary<string, ClientTransfer> ClientTransfers = new Dictionary<string, ClientTransfer>();
         private static readonly HashSet<string> RegisteredSoundGroups = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         private static readonly Dictionary<string, SearchSession> SearchSessions = new Dictionary<string, SearchSession>();
+        private static readonly object ServerQueueSyncRoot = new object();
+        private static readonly Queue<QueuedSong> ServerQueue = new Queue<QueuedSong>();
         private static float ServerPreDelaySeconds = DefaultPreDelaySeconds;
 
         public static ModEvents.EModEventResult ServerHandleChatMessage(ref ModEvents.SChatMessageData data)
@@ -44,6 +48,16 @@ namespace Boombox
                 return ServerHandleSearchChatMessage(message.Substring(SearchChatPrefix.Length).Trim(), ref data);
             }
 
+            if (message.StartsWith(QueueAddNumberChatPrefix, StringComparison.OrdinalIgnoreCase))
+            {
+                return ServerHandleQueueAddNumberChatMessage(message.Substring(QueueAddNumberChatPrefix.Length).Trim(), ref data);
+            }
+
+            if (message.StartsWith(QueueAddChatPrefix, StringComparison.OrdinalIgnoreCase))
+            {
+                return ServerHandleQueueAddChatMessage(message.Substring(QueueAddChatPrefix.Length).Trim(), ref data);
+            }
+
             if (message.StartsWith(PreDelayChatPrefix, StringComparison.OrdinalIgnoreCase))
             {
                 return ServerHandlePreDelayChatMessage(message.Substring(PreDelayChatPrefix.Length).Trim(), ref data);
@@ -56,7 +70,7 @@ namespace Boombox
 
             if (message.StartsWith(YoutubeChatPrefix, StringComparison.OrdinalIgnoreCase))
             {
-                return ServerHandleYoutubeChatMessage(message.Substring(YoutubeChatPrefix.Length).Trim());
+                return ServerHandleYoutubeChatMessage(message.Substring(YoutubeChatPrefix.Length).Trim(), ref data);
             }
 
             if (!message.StartsWith(ChatPrefix, StringComparison.OrdinalIgnoreCase))
@@ -74,10 +88,18 @@ namespace Boombox
                 return ModEvents.EModEventResult.StopHandlersAndVanilla;
             }
 
+            ClearServerQueue("PLAY command");
             var songName = message.Substring(ChatPrefix.Length).Trim();
             if (!TryResolveSongPath(songName, out var songPath, out var normalizedName))
             {
                 Debug.LogWarning($"[Boombox] PLAY ignored (song not found or invalid): '{songName}'");
+                return ModEvents.EModEventResult.StopHandlersAndVanilla;
+            }
+
+            var world = GameManager.Instance?.World;
+            var instigator = world?.GetEntity(data.SenderEntityId) as EntityPlayer;
+            if (BoomboxAudioManager.ServerPlayLocalMusicFile(world, positions, songPath, instigator))
+            {
                 return ModEvents.EModEventResult.StopHandlersAndVanilla;
             }
 
@@ -176,11 +198,73 @@ namespace Boombox
                 return ModEvents.EModEventResult.StopHandlersAndVanilla;
             }
 
+            ClearServerQueue("PLAYNUM command");
             gameManager.StartCoroutine(ServerDownloadSearchResultAndTransferRoutine(session.Items[number - 1], positions, data.ClientInfo, data.SenderEntityId));
             return ModEvents.EModEventResult.StopHandlersAndVanilla;
         }
 
-        private static ModEvents.EModEventResult ServerHandleYoutubeChatMessage(string query)
+        private static ModEvents.EModEventResult ServerHandleQueueAddChatMessage(string query, ref ModEvents.SChatMessageData data)
+        {
+            if (!IsServer())
+            {
+                return ModEvents.EModEventResult.StopHandlersAndVanilla;
+            }
+
+            if (string.IsNullOrWhiteSpace(query))
+            {
+                SendChatReply(data.ClientInfo, data.SenderEntityId, "Usage: QUEUEADD <query>");
+                return ModEvents.EModEventResult.StopHandlersAndVanilla;
+            }
+
+            var gameManager = GameManager.Instance;
+            if (gameManager == null)
+            {
+                Debug.LogWarning("[Boombox] QUEUEADD ignored (game manager missing)");
+                return ModEvents.EModEventResult.StopHandlersAndVanilla;
+            }
+
+            gameManager.StartCoroutine(ServerQueueAddRoutine(query, data.ClientInfo, data.SenderEntityId));
+            return ModEvents.EModEventResult.StopHandlersAndVanilla;
+        }
+
+        private static ModEvents.EModEventResult ServerHandleQueueAddNumberChatMessage(string value, ref ModEvents.SChatMessageData data)
+        {
+            if (!IsServer())
+            {
+                return ModEvents.EModEventResult.StopHandlersAndVanilla;
+            }
+
+            if (!int.TryParse(value.Trim(), out var number) || number < 1)
+            {
+                SendChatReply(data.ClientInfo, data.SenderEntityId, "Usage: QUEUEADDNUM <number>");
+                return ModEvents.EModEventResult.StopHandlersAndVanilla;
+            }
+
+            var sessionKey = GetSearchSessionKey(ref data);
+            if (!SearchSessions.TryGetValue(sessionKey, out var session) || session.Items.Count == 0)
+            {
+                SendChatReply(data.ClientInfo, data.SenderEntityId, "No SEARCH results cached. Use SEARCH <query> first.");
+                return ModEvents.EModEventResult.StopHandlersAndVanilla;
+            }
+
+            if (number > session.Items.Count)
+            {
+                SendChatReply(data.ClientInfo, data.SenderEntityId, $"QUEUEADDNUM {number} is out of range. Last SEARCH has {session.Items.Count} result(s).");
+                return ModEvents.EModEventResult.StopHandlersAndVanilla;
+            }
+
+            var gameManager = GameManager.Instance;
+            if (gameManager == null)
+            {
+                Debug.LogWarning("[Boombox] QUEUEADDNUM ignored (game manager missing)");
+                return ModEvents.EModEventResult.StopHandlersAndVanilla;
+            }
+
+            gameManager.StartCoroutine(ServerQueueAddSearchResultRoutine(session.Items[number - 1], data.ClientInfo, data.SenderEntityId));
+            return ModEvents.EModEventResult.StopHandlersAndVanilla;
+        }
+
+        private static ModEvents.EModEventResult ServerHandleYoutubeChatMessage(string query, ref ModEvents.SChatMessageData data)
         {
             if (!IsServer())
             {
@@ -198,7 +282,8 @@ namespace Boombox
                 return ModEvents.EModEventResult.StopHandlersAndVanilla;
             }
 
-            gameManager.StartCoroutine(ServerDownloadAndTransferRoutine(query, positions));
+            ClearServerQueue("PLAYU command");
+            gameManager.StartCoroutine(ServerDownloadAndTransferRoutine(query, positions, data.ClientInfo, data.SenderEntityId));
             return ModEvents.EModEventResult.StopHandlersAndVanilla;
         }
 
@@ -236,19 +321,72 @@ namespace Boombox
             return true;
         }
 
-        private static IEnumerator ServerDownloadAndTransferRoutine(string query, List<Vector3i> positions)
+        public static void ClearServerQueue(string reason)
+        {
+            lock (ServerQueueSyncRoot)
+            {
+                if (ServerQueue.Count == 0)
+                {
+                    return;
+                }
+
+                ServerQueue.Clear();
+            }
+
+            Debug.Log($"[Boombox] Queue cleared reason='{reason}'");
+        }
+
+        public static bool TryDequeueServerQueue(out string filePath, out string displayName)
+        {
+            lock (ServerQueueSyncRoot)
+            {
+                if (ServerQueue.Count == 0)
+                {
+                    filePath = string.Empty;
+                    displayName = string.Empty;
+                    return false;
+                }
+
+                var item = ServerQueue.Dequeue();
+                filePath = item.FilePath;
+                displayName = item.DisplayName;
+                Debug.Log($"[Boombox] Queue dequeued item='{displayName}' remaining={ServerQueue.Count}");
+                return true;
+            }
+        }
+
+        private static int EnqueueServerQueue(string filePath, string displayName)
+        {
+            lock (ServerQueueSyncRoot)
+            {
+                ServerQueue.Enqueue(new QueuedSong(filePath, displayName));
+                return ServerQueue.Count;
+            }
+        }
+
+        private static IEnumerator ServerDownloadAndTransferRoutine(string query, List<Vector3i> positions, ClientInfo clientInfo, int senderEntityId)
         {
             var downloader = CreateDefaultMusicDownloader();
             var result = new MusicDownloadResult();
+            SendChatReply(clientInfo, senderEntityId, $"Downloading now: {query}");
             yield return downloader.DownloadByQuery(query, result);
 
             if (!result.Success)
             {
                 Debug.LogWarning($"[Boombox] PLAYU download failed downloader='{downloader.Name}' exit={result.ExitCode} query='{query}' error='{result.Error}' output='{Truncate(result.DiagnosticOutput, 2000)}'");
+                SendChatReply(clientInfo, senderEntityId, $"Download failed: {result.Error}");
                 yield break;
             }
 
             BoomboxAudioManager.RefreshLocalMusicLibrary();
+            var world = GameManager.Instance?.World;
+            var instigator = world?.GetEntity(senderEntityId) as EntityPlayer;
+            if (BoomboxAudioManager.ServerPlayLocalMusicFile(world, positions, result.FilePath, instigator))
+            {
+                SendChatReply(clientInfo, senderEntityId, $"Playing now: {query}");
+                yield break;
+            }
+
             yield return ServerTransferSongRoutine(result.FilePath, query, positions);
         }
 
@@ -288,7 +426,55 @@ namespace Boombox
             }
 
             BoomboxAudioManager.RefreshLocalMusicLibrary();
+            var world = GameManager.Instance?.World;
+            var instigator = world?.GetEntity(senderEntityId) as EntityPlayer;
+            if (BoomboxAudioManager.ServerPlayLocalMusicFile(world, positions, result.FilePath, instigator))
+            {
+                SendChatReply(clientInfo, senderEntityId, $"Playing now: {item.DisplayName}");
+                yield break;
+            }
+
             yield return ServerTransferSongRoutine(result.FilePath, item.DisplayName, positions);
+        }
+
+        private static IEnumerator ServerQueueAddRoutine(string query, ClientInfo clientInfo, int senderEntityId)
+        {
+            var downloader = CreateDefaultMusicDownloader();
+            var result = new MusicDownloadResult();
+            SendChatReply(clientInfo, senderEntityId, $"Queue download: {query}");
+            yield return downloader.DownloadByQuery(query, result);
+
+            if (!result.Success)
+            {
+                Debug.LogWarning($"[Boombox] QUEUEADD download failed downloader='{downloader.Name}' exit={result.ExitCode} query='{query}' error='{result.Error}' output='{Truncate(result.DiagnosticOutput, 1000)}'");
+                SendChatReply(clientInfo, senderEntityId, $"Queue add failed: {result.Error}");
+                yield break;
+            }
+
+            BoomboxAudioManager.RefreshLocalMusicLibrary();
+            var count = EnqueueServerQueue(result.FilePath, query);
+            SendChatReply(clientInfo, senderEntityId, $"Queued #{count}: {query}");
+            Debug.Log($"[Boombox] QUEUEADD completed downloader='{downloader.Name}' query='{query}' queue={count}");
+        }
+
+        private static IEnumerator ServerQueueAddSearchResultRoutine(MusicSearchItem item, ClientInfo clientInfo, int senderEntityId)
+        {
+            var downloader = CreateMusicDownloader(item.Source);
+            var result = new MusicDownloadResult();
+            SendChatReply(clientInfo, senderEntityId, $"Queue download: {item.DisplayName}");
+            yield return downloader.DownloadSearchResult(item, result);
+
+            if (!result.Success)
+            {
+                Debug.LogWarning($"[Boombox] QUEUEADDNUM download failed downloader='{downloader.Name}' exit={result.ExitCode} item='{item.DisplayName}' error='{result.Error}' output='{Truncate(result.DiagnosticOutput, 1000)}'");
+                SendChatReply(clientInfo, senderEntityId, $"Queue add failed: {result.Error}");
+                yield break;
+            }
+
+            BoomboxAudioManager.RefreshLocalMusicLibrary();
+            var count = EnqueueServerQueue(result.FilePath, item.DisplayName);
+            SendChatReply(clientInfo, senderEntityId, $"Queued #{count}: {item.DisplayName}");
+            Debug.Log($"[Boombox] QUEUEADDNUM completed downloader='{downloader.Name}' item='{item.DisplayName}' queue={count}");
         }
 
         public static IEnumerator ServerTransferSongRoutine(string songPath, string songName, List<Vector3i> positions)
@@ -852,7 +1038,7 @@ namespace Boombox
                 return;
             }
 
-            SendChatReply(clientInfo, senderEntityId, $"Results for '{query}' ({items.Count}). Use PLAYNUM <n>:");
+            SendChatReply(clientInfo, senderEntityId, $"Results for '{query}' ({items.Count}). Use PLAYNUM <n> or QUEUEADDNUM <n>:");
             for (var i = 0; i < items.Count; i++)
             {
                 var item = items[i];
@@ -942,6 +1128,18 @@ namespace Boombox
             public string Query { get; }
             public string Source { get; }
             public List<MusicSearchItem> Items { get; }
+        }
+
+        private sealed class QueuedSong
+        {
+            public QueuedSong(string filePath, string displayName)
+            {
+                FilePath = filePath ?? string.Empty;
+                DisplayName = displayName ?? Path.GetFileNameWithoutExtension(FilePath);
+            }
+
+            public string FilePath { get; }
+            public string DisplayName { get; }
         }
 
     }

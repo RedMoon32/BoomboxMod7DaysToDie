@@ -36,5 +36,21 @@
       <property name="Tags" value="electricianSkill"/>
       <property name="FilterTags" value="MC_playerBlocks,SC_electrical"/>
     </block>
+
+    <block name="boomboxPrefabTestBlock">
+      <property name="Extends" value="decoEntityMetalMaster" param1="CustomIcon,Model,ModelOffset,CreativeMode,Group,FilterTags,DescriptionKey"/>
+      <property name="CreativeMode" value="Player"/>
+      <property name="CustomIcon" value="boomboxPrefabTest"/>
+      <property name="DescriptionKey" value="boomboxPrefabTestBlockDesc"/>
+      <property name="Shape" value="ModelEntity"/>
+      <property name="Model" value="#@modfolder:Resources/BoomboxPrefab.unity3d?BoomboxPrefab.prefab"/>
+      <property name="ModelOffset" value="0,0,0"/>
+      <property name="ImposterDontBlock" value="true"/>
+      <property name="WaterFlow" value="permitted"/>
+      <property name="Collide" value="movement,melee,bullet,arrow,rocket"/>
+      <property name="TakeDelay" value="1"/>
+      <property name="Group" value="Decor/Miscellaneous"/>
+      <property name="FilterTags" value="MC_playerBlocks,SC_decor"/>
+    </block>
   </append>
 </configs>
