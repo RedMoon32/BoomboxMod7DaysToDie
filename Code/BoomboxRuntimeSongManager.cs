@@ -111,12 +111,12 @@ namespace Boombox
 
             if (!TryParseSeconds(value, out var seconds))
             {
-                SendChatReply(data.ClientInfo, $"Usage: SETPREDELAY <seconds 0..{MaxPreDelaySeconds:0}>");
+                SendChatReply(data.ClientInfo, data.SenderEntityId, $"Usage: SETPREDELAY <seconds 0..{MaxPreDelaySeconds:0}>");
                 return ModEvents.EModEventResult.StopHandlersAndVanilla;
             }
 
             ServerPreDelaySeconds = seconds;
-            SendChatReply(data.ClientInfo, $"Runtime song pre-delay set to {ServerPreDelaySeconds:0.##}s");
+            SendChatReply(data.ClientInfo, data.SenderEntityId, $"Runtime song pre-delay set to {ServerPreDelaySeconds:0.##}s");
             Debug.Log($"[Boombox] Runtime song pre-delay set to {ServerPreDelaySeconds:0.##}s");
             return ModEvents.EModEventResult.StopHandlersAndVanilla;
         }
@@ -130,7 +130,7 @@ namespace Boombox
 
             if (string.IsNullOrWhiteSpace(query))
             {
-                SendChatReply(data.ClientInfo, "Usage: SEARCH <query>");
+                SendChatReply(data.ClientInfo, data.SenderEntityId, "Usage: SEARCH <query>");
                 return ModEvents.EModEventResult.StopHandlersAndVanilla;
             }
 
@@ -141,7 +141,7 @@ namespace Boombox
                 return ModEvents.EModEventResult.StopHandlersAndVanilla;
             }
 
-            gameManager.StartCoroutine(ServerSearchRoutine(query, GetSearchSessionKey(ref data), data.ClientInfo));
+            gameManager.StartCoroutine(ServerSearchRoutine(query, GetSearchSessionKey(ref data), data.ClientInfo, data.SenderEntityId));
             return ModEvents.EModEventResult.StopHandlersAndVanilla;
         }
 
@@ -154,7 +154,7 @@ namespace Boombox
 
             if (!int.TryParse(value.Trim(), out var number) || number < 1)
             {
-                SendChatReply(data.ClientInfo, "Usage: PLAYNUM <number>");
+                SendChatReply(data.ClientInfo, data.SenderEntityId, "Usage: PLAYNUM <number>");
                 return ModEvents.EModEventResult.StopHandlersAndVanilla;
             }
 
@@ -166,17 +166,17 @@ namespace Boombox
             var sessionKey = GetSearchSessionKey(ref data);
             if (!SearchSessions.TryGetValue(sessionKey, out var session) || session.Items.Count == 0)
             {
-                SendChatReply(data.ClientInfo, "No SEARCH results cached. Use SEARCH <query> first.");
+                SendChatReply(data.ClientInfo, data.SenderEntityId, "No SEARCH results cached. Use SEARCH <query> first.");
                 return ModEvents.EModEventResult.StopHandlersAndVanilla;
             }
 
             if (number > session.Items.Count)
             {
-                SendChatReply(data.ClientInfo, $"PLAYNUM {number} is out of range. Last SEARCH has {session.Items.Count} result(s).");
+                SendChatReply(data.ClientInfo, data.SenderEntityId, $"PLAYNUM {number} is out of range. Last SEARCH has {session.Items.Count} result(s).");
                 return ModEvents.EModEventResult.StopHandlersAndVanilla;
             }
 
-            gameManager.StartCoroutine(ServerDownloadSearchResultAndTransferRoutine(session.Items[number - 1], positions, data.ClientInfo));
+            gameManager.StartCoroutine(ServerDownloadSearchResultAndTransferRoutine(session.Items[number - 1], positions, data.ClientInfo, data.SenderEntityId));
             return ModEvents.EModEventResult.StopHandlersAndVanilla;
         }
 
@@ -251,45 +251,50 @@ namespace Boombox
             yield return ServerTransferSongRoutine(result.FilePath, query, positions);
         }
 
-        private static IEnumerator ServerSearchRoutine(string query, string sessionKey, ClientInfo clientInfo)
+        private static IEnumerator ServerSearchRoutine(string query, string sessionKey, ClientInfo clientInfo, int senderEntityId)
         {
             var downloader = CreateDefaultMusicDownloader();
             var result = new MusicSearchResult();
             Debug.Log($"[Boombox] SEARCH started downloader='{downloader.Name}' query='{query}'");
-            SendChatReply(clientInfo, $"Searching {downloader.Name}: {query}");
+            SendChatReply(clientInfo, senderEntityId, $"Searching {downloader.Name}: {query}");
 
             yield return downloader.SearchByQuery(query, SearchResultLimit, result);
 
             if (!result.Success)
             {
                 Debug.LogWarning($"[Boombox] SEARCH failed downloader='{downloader.Name}' exit={result.ExitCode} query='{query}' error='{result.Error}' output='{Truncate(result.DiagnosticOutput, 1000)}'");
-                SendChatReply(clientInfo, $"Search failed: {result.Error}");
+                SendChatReply(clientInfo, senderEntityId, $"Search failed: {result.Error}");
                 yield break;
             }
 
             SearchSessions[sessionKey] = new SearchSession(query, downloader.Name, result.Items);
-            SendSearchResults(clientInfo, query, result.Items);
+            SendSearchResults(clientInfo, senderEntityId, query, result.Items);
             Debug.Log($"[Boombox] SEARCH completed downloader='{downloader.Name}' query='{query}' results={result.Items.Count}");
         }
 
-        private static IEnumerator ServerDownloadSearchResultAndTransferRoutine(MusicSearchItem item, List<Vector3i> positions, ClientInfo clientInfo)
+        private static IEnumerator ServerDownloadSearchResultAndTransferRoutine(MusicSearchItem item, List<Vector3i> positions, ClientInfo clientInfo, int senderEntityId)
         {
             var downloader = CreateMusicDownloader(item.Source);
             var result = new MusicDownloadResult();
-            SendChatReply(clientInfo, $"Downloading #{item.DisplayName}");
+            SendChatReply(clientInfo, senderEntityId, $"Downloading #{item.DisplayName}");
             yield return downloader.DownloadSearchResult(item, result);
 
             if (!result.Success)
             {
                 Debug.LogWarning($"[Boombox] PLAYNUM download failed downloader='{downloader.Name}' exit={result.ExitCode} item='{item.DisplayName}' error='{result.Error}' output='{Truncate(result.DiagnosticOutput, 1000)}'");
-                SendChatReply(clientInfo, $"Download failed: {result.Error}");
+                SendChatReply(clientInfo, senderEntityId, $"Download failed: {result.Error}");
                 yield break;
             }
 
             yield return ServerTransferSongRoutine(result.FilePath, item.DisplayName, positions);
         }
 
-        private static IEnumerator ServerTransferSongRoutine(string songPath, string songName, List<Vector3i> positions)
+        public static IEnumerator ServerTransferSongRoutine(string songPath, string songName, List<Vector3i> positions)
+        {
+            return ServerTransferSongRoutine(songPath, songName, positions, false, string.Empty, null);
+        }
+
+        public static IEnumerator ServerTransferSongRoutine(string songPath, string songName, List<Vector3i> positions, bool notifyServerOnFinished, string finishedClipName, Func<bool> shouldComplete)
         {
             byte[] bytes;
             try
@@ -306,12 +311,12 @@ namespace Boombox
             var extension = Path.GetExtension(songPath).ToLowerInvariant();
             var start = NetPackageManager
                 .GetPackage<NetPackageBoomboxSongStart>()
-                .Setup(songId, songName, extension, bytes.Length, positions);
+                .Setup(songId, songName, extension, bytes.Length, positions, notifyServerOnFinished, finishedClipName);
 
             BroadcastToClients(start);
             if (!GameManager.IsDedicatedServer)
             {
-                ClientReceiveSongStart(songId, songName, extension, bytes.Length, positions);
+                ClientReceiveSongStart(songId, songName, extension, bytes.Length, positions, notifyServerOnFinished, finishedClipName);
             }
 
             var chunkIndex = 0;
@@ -341,6 +346,12 @@ namespace Boombox
                 }
             }
 
+            if (shouldComplete != null && !shouldComplete())
+            {
+                Debug.Log($"[Boombox] Runtime song transfer canceled before playback song='{songName}'");
+                yield break;
+            }
+
             var scheduledStartUtcTicks = DateTime.UtcNow.AddSeconds(ServerPreDelaySeconds).Ticks;
             var complete = NetPackageManager
                 .GetPackage<NetPackageBoomboxSongComplete>()
@@ -356,6 +367,11 @@ namespace Boombox
         }
 
         public static void ClientReceiveSongStart(string songId, string songName, string extension, long totalBytes, List<Vector3i> positions)
+        {
+            ClientReceiveSongStart(songId, songName, extension, totalBytes, positions, false, string.Empty);
+        }
+
+        public static void ClientReceiveSongStart(string songId, string songName, string extension, long totalBytes, List<Vector3i> positions, bool notifyServerOnFinished, string finishedClipName)
         {
             if (GameManager.IsDedicatedServer || string.IsNullOrEmpty(songId))
             {
@@ -380,8 +396,15 @@ namespace Boombox
                 FinalPath = finalPath,
                 TempPath = tempPath,
                 Positions = positions ?? new List<Vector3i>(),
+                NotifyServerOnFinished = notifyServerOnFinished,
+                FinishedClipName = finishedClipName ?? string.Empty,
                 Stream = new FileStream(tempPath, FileMode.Create, FileAccess.Write, FileShare.None)
             };
+
+            if (transfer.NotifyServerOnFinished && !string.IsNullOrEmpty(transfer.FinishedClipName))
+            {
+                BoomboxAudioManager.ClientMarkRuntimePending(transfer.Positions, transfer.FinishedClipName);
+            }
 
             ClientTransfers[songId] = transfer;
             Debug.Log($"[Boombox] Receiving runtime song '{transfer.SongName}' id={songId} bytes={totalBytes}");
@@ -494,6 +517,17 @@ namespace Boombox
                 }
 
                 var soundGroupName = RegisterRuntimeSound(transfer.SongId, clip);
+                var playbackPositions = transfer.Positions;
+                if (transfer.NotifyServerOnFinished && !string.IsNullOrEmpty(transfer.FinishedClipName))
+                {
+                    playbackPositions = BoomboxAudioManager.ClientFilterRuntimePendingPositions(transfer.Positions, transfer.FinishedClipName);
+                    if (playbackPositions.Count == 0)
+                    {
+                        Debug.Log($"[Boombox] Runtime song skipped because boombox state changed group='{soundGroupName}'");
+                        yield break;
+                    }
+                }
+
                 var secondsUntilStart = GetSecondsUntilUtcTicks(transfer.ScheduledStartUtcTicks);
                 if (secondsUntilStart > 0f)
                 {
@@ -502,8 +536,8 @@ namespace Boombox
                 }
 
                 var offsetSeconds = Mathf.Clamp(-GetSecondsUntilUtcTicks(transfer.ScheduledStartUtcTicks), 0f, Math.Max(0f, clip.length - 0.1f));
-                BoomboxAudioManager.ClientPlayRuntime(transfer.Positions, soundGroupName, offsetSeconds);
-                Debug.Log($"[Boombox] Runtime song playing group='{soundGroupName}' positions={transfer.Positions.Count} length={clip.length:0.00}s offset={offsetSeconds:0.00}s");
+                BoomboxAudioManager.ClientPlayRuntime(playbackPositions, soundGroupName, offsetSeconds, transfer.NotifyServerOnFinished, transfer.FinishedClipName);
+                Debug.Log($"[Boombox] Runtime song playing group='{soundGroupName}' positions={playbackPositions.Count} length={clip.length:0.00}s offset={offsetSeconds:0.00}s");
             }
         }
 
@@ -781,24 +815,24 @@ namespace Boombox
             return "entity:" + data.SenderEntityId;
         }
 
-        private static void SendSearchResults(ClientInfo clientInfo, string query, List<MusicSearchItem> items)
+        private static void SendSearchResults(ClientInfo clientInfo, int senderEntityId, string query, List<MusicSearchItem> items)
         {
             if (items == null || items.Count == 0)
             {
-                SendChatReply(clientInfo, $"No results for: {query}");
+                SendChatReply(clientInfo, senderEntityId, $"No results for: {query}");
                 return;
             }
 
-            SendChatReply(clientInfo, $"Results for '{query}' ({items.Count}). Use PLAYNUM <n>:");
+            SendChatReply(clientInfo, senderEntityId, $"Results for '{query}' ({items.Count}). Use PLAYNUM <n>:");
             for (var i = 0; i < items.Count; i++)
             {
                 var item = items[i];
                 var duration = string.IsNullOrEmpty(item.Duration) ? string.Empty : " [" + item.Duration + "]";
-                SendChatReply(clientInfo, $"{i + 1}. {item.DisplayName}{duration}");
+                SendChatReply(clientInfo, senderEntityId, $"{i + 1}. {item.DisplayName}{duration}");
             }
         }
 
-        private static void SendChatReply(ClientInfo clientInfo, string message)
+        private static void SendChatReply(ClientInfo clientInfo, int recipientEntityId, string message)
         {
             var text = "[Boombox] " + (message ?? string.Empty);
             Debug.Log(text);
@@ -810,7 +844,11 @@ namespace Boombox
 
             try
             {
-                clientInfo.SendPackage(NetPackageManager.GetPackage<NetPackageSimpleChat>().Setup(text));
+                var package = NetPackageManager
+                    .GetPackage<NetPackageBoomboxChatMessage>()
+                    .Setup(text);
+
+                clientInfo.SendPackage(package);
             }
             catch (Exception ex)
             {
@@ -858,6 +896,8 @@ namespace Boombox
             public string TempPath;
             public long ScheduledStartUtcTicks;
             public List<Vector3i> Positions;
+            public bool NotifyServerOnFinished;
+            public string FinishedClipName;
             public FileStream Stream;
         }
 

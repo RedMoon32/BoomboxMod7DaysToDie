@@ -13,14 +13,23 @@ namespace Boombox
         private string _songName = string.Empty;
         private string _extension = string.Empty;
         private long _totalBytes;
+        private bool _notifyServerOnFinished;
+        private string _finishedClipName = string.Empty;
         private readonly List<Vector3i> _positions = new List<Vector3i>();
 
         public NetPackageBoomboxSongStart Setup(string songId, string songName, string extension, long totalBytes, List<Vector3i> positions)
+        {
+            return Setup(songId, songName, extension, totalBytes, positions, false, string.Empty);
+        }
+
+        public NetPackageBoomboxSongStart Setup(string songId, string songName, string extension, long totalBytes, List<Vector3i> positions, bool notifyServerOnFinished, string finishedClipName)
         {
             _songId = songId ?? string.Empty;
             _songName = songName ?? string.Empty;
             _extension = extension ?? string.Empty;
             _totalBytes = totalBytes;
+            _notifyServerOnFinished = notifyServerOnFinished;
+            _finishedClipName = finishedClipName ?? string.Empty;
             _positions.Clear();
             if (positions != null)
             {
@@ -34,7 +43,7 @@ namespace Boombox
 
         public override int GetLength()
         {
-            return StringLength(_songId) + StringLength(_songName) + StringLength(_extension) + sizeof(long) + sizeof(int) + _positions.Count * sizeof(int) * 3;
+            return StringLength(_songId) + StringLength(_songName) + StringLength(_extension) + sizeof(long) + sizeof(bool) + StringLength(_finishedClipName) + sizeof(int) + _positions.Count * sizeof(int) * 3;
         }
 
         public override void read(PooledBinaryReader reader)
@@ -43,6 +52,8 @@ namespace Boombox
             _songName = ReadString(reader);
             _extension = ReadString(reader);
             _totalBytes = reader.ReadInt64();
+            _notifyServerOnFinished = reader.ReadBoolean();
+            _finishedClipName = ReadString(reader);
             _positions.Clear();
             var count = reader.ReadInt32();
             for (var i = 0; i < count; i++)
@@ -59,6 +70,8 @@ namespace Boombox
             WriteString(binaryWriter, _songName);
             WriteString(binaryWriter, _extension);
             binaryWriter.Write(_totalBytes);
+            binaryWriter.Write(_notifyServerOnFinished);
+            WriteString(binaryWriter, _finishedClipName);
             binaryWriter.Write(_positions.Count);
             foreach (var position in _positions)
             {
@@ -70,7 +83,7 @@ namespace Boombox
 
         public override void ProcessPackage(World world, GameManager callbacks)
         {
-            BoomboxRuntimeSongManager.ClientReceiveSongStart(_songId, _songName, _extension, _totalBytes, _positions);
+            BoomboxRuntimeSongManager.ClientReceiveSongStart(_songId, _songName, _extension, _totalBytes, _positions, _notifyServerOnFinished, _finishedClipName);
         }
 
         private static int StringLength(string value)

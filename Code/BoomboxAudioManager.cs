@@ -215,6 +215,7 @@ namespace Boombox
                 {
                     var previousClip = state.ClipName;
                     state.ToggleCount++;
+                    state.PlaybackToken++;
                     state.ClipName = SelectClip(world, position, state.ToggleCount, previousClip);
                     state.IsPlaying = true;
                     shouldPlay = true;
@@ -222,6 +223,7 @@ namespace Boombox
                 else
                 {
                     state.IsPlaying = false;
+                    state.PlaybackToken++;
                     shouldStop = true;
                     ServerStates.Remove(position);
                 }
@@ -229,8 +231,8 @@ namespace Boombox
 
             if (shouldPlay)
             {
-                BroadcastPlay(position, state);
-                if (!GameManager.IsDedicatedServer)
+                var usesRuntimeTransfer = BroadcastPlay(position, state);
+                if (!usesRuntimeTransfer && !GameManager.IsDedicatedServer)
                 {
                     ClientPlay(position, state.ClipName);
                 }
@@ -321,12 +323,14 @@ namespace Boombox
                 if (string.IsNullOrEmpty(selected))
                 {
                     state.IsPlaying = false;
+                    state.PlaybackToken++;
                     shouldStop = true;
                     ServerStates.Remove(position);
                     Debug.Log($"[Boombox] TrackFinished stopping playback pos={position} clip='{normalizedClip}'");
                 }
                 else
                 {
+                    state.PlaybackToken++;
                     state.ClipName = selected;
                     nextClip = selected;
                     Debug.Log($"[Boombox] TrackFinished advancing pos={position} clip='{normalizedClip}' -> next='{nextClip}'");
@@ -351,8 +355,8 @@ namespace Boombox
                 return;
             }
 
-            BroadcastPlay(position, state);
-            if (!GameManager.IsDedicatedServer)
+            var usesRuntimeTransfer = BroadcastPlay(position, state);
+            if (!usesRuntimeTransfer && !GameManager.IsDedicatedServer)
             {
                 ClientPlay(position, nextClip);
             }
@@ -552,13 +556,35 @@ namespace Boombox
             Debug.Log($"[Boombox] Volume set to {normalizedVolume:0.00}");
         }
 
-        private static void BroadcastPlay(Vector3i position, BoomboxServerState state)
+        private static bool BroadcastPlay(Vector3i position, BoomboxServerState state)
         {
+            if (state != null && TryGetLocalMusicTrack(state.ClipName, out var track))
+            {
+                var gameManager = GameManager.Instance;
+                if (gameManager != null)
+                {
+                    var expectedClipName = state.ClipName ?? string.Empty;
+                    var expectedToken = state.PlaybackToken;
+                    gameManager.StartCoroutine(BoomboxRuntimeSongManager.ServerTransferSongRoutine(
+                        track.FilePath,
+                        Path.GetFileNameWithoutExtension(track.FilePath),
+                        new List<Vector3i> { position },
+                        true,
+                        expectedClipName,
+                        () => IsServerPlaybackCurrent(position, expectedClipName, expectedToken)));
+
+                    return true;
+                }
+
+                Debug.LogWarning($"[Boombox] Runtime local music transfer skipped (game manager missing) pos={position}");
+            }
+
             var package = NetPackageManager
                 .GetPackage<NetPackageBoomboxPlay>()
                 .Setup(position, state.ClipName);
 
             SingletonMonoBehaviour<ConnectionManager>.Instance.SendPackage(package, false, -1, -1, -1, null, -1, false);
+            return false;
         }
 
         private static void BroadcastStop(Vector3i position)
@@ -668,6 +694,11 @@ namespace Boombox
 
         public static void ClientPlayRuntime(IEnumerable<Vector3i> positions, string soundGroupName, float startOffsetSeconds)
         {
+            ClientPlayRuntime(positions, soundGroupName, startOffsetSeconds, false, string.Empty);
+        }
+
+        public static void ClientPlayRuntime(IEnumerable<Vector3i> positions, string soundGroupName, float startOffsetSeconds, bool notifyServerOnFinished, string finishedClipName)
+        {
             if (!IsClient || positions == null)
             {
                 return;
@@ -675,8 +706,47 @@ namespace Boombox
 
             foreach (var position in positions)
             {
-                ClientPlayInternal(position, soundGroupName ?? string.Empty, false, startOffsetSeconds);
+                ClientPlayInternal(position, soundGroupName ?? string.Empty, notifyServerOnFinished, startOffsetSeconds, finishedClipName);
             }
+        }
+
+        public static void ClientMarkRuntimePending(IEnumerable<Vector3i> positions, string finishedClipName)
+        {
+            if (!IsClient || positions == null || string.IsNullOrEmpty(finishedClipName))
+            {
+                return;
+            }
+
+            lock (ClientSyncRoot)
+            {
+                foreach (var position in positions)
+                {
+                    ClientStates[position] = finishedClipName;
+                }
+            }
+        }
+
+        public static List<Vector3i> ClientFilterRuntimePendingPositions(IEnumerable<Vector3i> positions, string finishedClipName)
+        {
+            var result = new List<Vector3i>();
+            if (!IsClient || positions == null || string.IsNullOrEmpty(finishedClipName))
+            {
+                return result;
+            }
+
+            lock (ClientSyncRoot)
+            {
+                foreach (var position in positions)
+                {
+                    if (ClientStates.TryGetValue(position, out var activeClip) &&
+                        string.Equals(activeClip ?? string.Empty, finishedClipName, StringComparison.Ordinal))
+                    {
+                        result.Add(position);
+                    }
+                }
+            }
+
+            return result;
         }
 
         public static void ClientSync(IEnumerable<BoomboxStateSnapshot> states)
@@ -722,7 +792,7 @@ namespace Boombox
             }
         }
 
-        private static void ClientPlayInternal(Vector3i position, string clipName, bool notifyServerOnFinished = true, float startOffsetSeconds = 0f)
+        private static void ClientPlayInternal(Vector3i position, string clipName, bool notifyServerOnFinished = true, float startOffsetSeconds = 0f, string finishedClipName = null)
         {
             var normalizedClip = clipName ?? string.Empty;
             var gameManager = GameManager.Instance;
@@ -765,7 +835,7 @@ namespace Boombox
 
                 if (notifyServerOnFinished)
                 {
-                    RegisterClientMonitorLocked(position, normalizedClip, handle, gameManager);
+                    RegisterClientMonitorLocked(position, normalizedClip, handle, gameManager, finishedClipName);
                 }
             }
         }
@@ -981,7 +1051,7 @@ namespace Boombox
             Debug.Log($"[Boombox] Local music registered group='{track.SoundGroupName}' file='{Path.GetFileName(track.FilePath)}'");
         }
 
-        private static void RegisterClientMonitorLocked(Vector3i position, string clipName, Handle handle, GameManager gameManager)
+        private static void RegisterClientMonitorLocked(Vector3i position, string clipName, Handle handle, GameManager gameManager, string finishedClipName = null)
         {
             if (GameManager.IsDedicatedServer || gameManager == null)
             {
@@ -1000,10 +1070,11 @@ namespace Boombox
                 token = existing.Token + 1;
             }
 
+            var reportClipName = string.IsNullOrEmpty(finishedClipName) ? clipName : finishedClipName;
             var state = new ClientPlaybackState { Token = token };
-            state.Coroutine = gameManager.StartCoroutine(ClientTrackMonitorRoutine(position, clipName, handle, token));
+            state.Coroutine = gameManager.StartCoroutine(ClientTrackMonitorRoutine(position, clipName, reportClipName, handle, token));
             ClientPlaybackCoroutines[position] = state;
-            Debug.Log($"[Boombox] Client monitor started pos={position} clip='{clipName}' token={token}");
+            Debug.Log($"[Boombox] Client monitor started pos={position} clip='{clipName}' finishedClip='{reportClipName}' token={token}");
         }
 
         private static void StopClientMonitorLocked(Vector3i position, GameManager gameManager)
@@ -1044,11 +1115,12 @@ namespace Boombox
             ClientPlaybackCoroutines.Clear();
         }
 
-        private static IEnumerator ClientTrackMonitorRoutine(Vector3i position, string clipName, Handle handle, int token)
+        private static IEnumerator ClientTrackMonitorRoutine(Vector3i position, string clipName, string finishedClipName, Handle handle, int token)
         {
             const float clipResolveTimeout = 2f;
             const float fallbackDuration = 30f;
             var normalizedClip = clipName ?? string.Empty;
+            var normalizedFinishedClip = string.IsNullOrEmpty(finishedClipName) ? normalizedClip : finishedClipName;
             Debug.Log($"[Boombox] Client monitor routine running pos={position} clip='{normalizedClip}' token={token}");
 
             var elapsed = 0f;
@@ -1124,7 +1196,7 @@ namespace Boombox
                 ClientPlaybackCoroutines.Remove(position);
             }
 
-            SendTrackFinishedToServer(position, normalizedClip);
+            SendTrackFinishedToServer(position, normalizedFinishedClip);
         }
 
         private static bool IsClipStillActive(Vector3i position, string clipName)
@@ -1141,6 +1213,18 @@ namespace Boombox
             lock (ClientSyncRoot)
             {
                 return ClientPlaybackCoroutines.TryGetValue(position, out var state) && state != null && state.Token == token;
+            }
+        }
+
+        private static bool IsServerPlaybackCurrent(Vector3i position, string clipName, int playbackToken)
+        {
+            lock (ServerSyncRoot)
+            {
+                return ServerStates.TryGetValue(position, out var state) &&
+                       state != null &&
+                       state.IsPlaying &&
+                       state.PlaybackToken == playbackToken &&
+                       string.Equals(state.ClipName ?? string.Empty, clipName ?? string.Empty, StringComparison.Ordinal);
             }
         }
 
@@ -1480,6 +1564,7 @@ namespace Boombox
             public bool IsPlaying;
             public string ClipName = string.Empty;
             public int ToggleCount;
+            public int PlaybackToken;
             public Coroutine NoiseCoroutine;
             public int LastActivatorEntityId = -1;
         }
