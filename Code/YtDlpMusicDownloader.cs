@@ -51,10 +51,10 @@ namespace Boombox
                 yield break;
             }
 
-            var downloadDir = Path.Combine(_modRoot, "YtdlpDownloads", "audio");
+            var downloadDir = GetMusicLibraryDirectory();
             Directory.CreateDirectory(downloadDir);
 
-            var fileBaseName = "playu_" + DateTime.UtcNow.ToString("yyyyMMdd_HHmmss") + "_" + Guid.NewGuid().ToString("N").Substring(0, 8);
+            var fileBaseName = BuildLibraryFileBaseName(query);
             var outputTemplate = fileBaseName + ".%(ext)s";
             var attempt = new DownloadAttemptResult();
 
@@ -189,6 +189,41 @@ namespace Boombox
             }
 
             return string.Empty;
+        }
+
+        private string GetMusicLibraryDirectory()
+        {
+            return Path.Combine(_modRoot, "Resources", "MusicToPlay");
+        }
+
+        private static string BuildLibraryFileBaseName(string query)
+        {
+            var baseName = SanitizeFileName(query);
+            return string.IsNullOrEmpty(baseName) ? "yt_dlp_track" : "yt_dlp_" + baseName;
+        }
+
+        private static string SanitizeFileName(string value)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                return string.Empty;
+            }
+
+            var invalidChars = Path.GetInvalidFileNameChars();
+            var builder = new StringBuilder(value.Trim().Length);
+            foreach (var ch in value.Trim())
+            {
+                if (invalidChars.Contains(ch))
+                {
+                    builder.Append('_');
+                    continue;
+                }
+
+                builder.Append(char.IsWhiteSpace(ch) ? '_' : ch);
+            }
+
+            var result = string.Join("_", builder.ToString().Split(new[] { '_' }, StringSplitOptions.RemoveEmptyEntries));
+            return result.Length > 120 ? result.Substring(0, 120).Trim('_') : result.Trim('_');
         }
 
         private Process StartProcess(string fileName, string arguments, out StringBuilder output)

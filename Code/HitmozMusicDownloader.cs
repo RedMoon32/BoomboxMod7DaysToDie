@@ -242,10 +242,10 @@ namespace Boombox
         {
             var result = new MusicDownloadResult();
             progress.SetSelectedTrack(track.DisplayName, trackCount);
-            var outputDir = Path.Combine(_modRoot, "HitmozDownloads", "audio");
+            var outputDir = GetMusicLibraryDirectory();
             Directory.CreateDirectory(outputDir);
 
-            var fileName = "hitmoz_" + DateTime.UtcNow.ToString("yyyyMMdd_HHmmss") + "_" + Guid.NewGuid().ToString("N").Substring(0, 8) + ".mp3";
+            var fileName = BuildLibraryFileName(track.DisplayName, track.Id, ".mp3");
             var filePath = Path.Combine(outputDir, fileName);
             DownloadTrack(track, filePath, progress);
 
@@ -445,6 +445,51 @@ namespace Boombox
             {
                 // ignored
             }
+        }
+
+        private string GetMusicLibraryDirectory()
+        {
+            return Path.Combine(_modRoot, "Resources", "MusicToPlay");
+        }
+
+        private static string BuildLibraryFileName(string displayName, string id, string extension)
+        {
+            var baseName = SanitizeFileName(displayName);
+            if (string.IsNullOrEmpty(baseName))
+            {
+                baseName = SanitizeFileName(id);
+            }
+
+            if (string.IsNullOrEmpty(baseName))
+            {
+                baseName = "hitmoz_track";
+            }
+
+            return baseName + extension;
+        }
+
+        private static string SanitizeFileName(string value)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                return string.Empty;
+            }
+
+            var invalidChars = Path.GetInvalidFileNameChars();
+            var builder = new StringBuilder(value.Trim().Length);
+            foreach (var ch in value.Trim())
+            {
+                if (invalidChars.Contains(ch))
+                {
+                    builder.Append('_');
+                    continue;
+                }
+
+                builder.Append(char.IsWhiteSpace(ch) ? '_' : ch);
+            }
+
+            var result = Regex.Replace(builder.ToString(), "_+", "_").Trim('_');
+            return result.Length > 120 ? result.Substring(0, 120).Trim('_') : result;
         }
 
         private sealed class DownloadProgress

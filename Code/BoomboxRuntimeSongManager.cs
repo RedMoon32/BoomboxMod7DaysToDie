@@ -601,12 +601,22 @@ namespace Boombox
                 return false;
             }
 
-            var root = GetModRootDirectory();
-            var codeDir = Path.Combine(root, "Code");
             var extension = Path.GetExtension(fileName);
+            var musicDir = GetLocalMusicDirectory();
+            var codeDir = Path.Combine(GetModRootDirectory(), "Code");
             var candidates = string.IsNullOrEmpty(extension)
-                ? new[] { Path.Combine(codeDir, fileName + ".wav"), Path.Combine(codeDir, fileName + ".mp3") }
-                : new[] { Path.Combine(codeDir, fileName) };
+                ? new[]
+                {
+                    Path.Combine(musicDir, fileName + ".wav"),
+                    Path.Combine(musicDir, fileName + ".mp3"),
+                    Path.Combine(codeDir, fileName + ".wav"),
+                    Path.Combine(codeDir, fileName + ".mp3")
+                }
+                : new[]
+                {
+                    Path.Combine(musicDir, fileName),
+                    Path.Combine(codeDir, fileName)
+                };
 
             foreach (var candidate in candidates)
             {
@@ -645,7 +655,19 @@ namespace Boombox
         private static string GetModRootDirectory()
         {
             var assemblyPath = typeof(BoomboxRuntimeSongManager).Assembly.Location;
-            return Path.GetDirectoryName(assemblyPath) ?? string.Empty;
+            var assemblyDirectory = Path.GetDirectoryName(assemblyPath) ?? string.Empty;
+            if (File.Exists(Path.Combine(assemblyDirectory, "ModInfo.xml")))
+            {
+                return assemblyDirectory;
+            }
+
+            var parent = Directory.GetParent(assemblyDirectory)?.FullName;
+            if (!string.IsNullOrEmpty(parent) && File.Exists(Path.Combine(parent, "ModInfo.xml")))
+            {
+                return parent;
+            }
+
+            return assemblyDirectory;
         }
 
         private static string GetAudioSourceName()
@@ -704,6 +726,11 @@ namespace Boombox
         private static string GetCacheDirectory()
         {
             return Path.Combine(GetModRootDirectory(), "Cache");
+        }
+
+        private static string GetLocalMusicDirectory()
+        {
+            return Path.Combine(GetModRootDirectory(), "Resources", "MusicToPlay");
         }
 
         private static string NormalizeExtension(string extension)
