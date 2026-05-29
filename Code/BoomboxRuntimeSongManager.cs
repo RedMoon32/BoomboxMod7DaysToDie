@@ -248,6 +248,7 @@ namespace Boombox
                 yield break;
             }
 
+            BoomboxAudioManager.RefreshLocalMusicLibrary();
             yield return ServerTransferSongRoutine(result.FilePath, query, positions);
         }
 
@@ -286,6 +287,7 @@ namespace Boombox
                 yield break;
             }
 
+            BoomboxAudioManager.RefreshLocalMusicLibrary();
             yield return ServerTransferSongRoutine(result.FilePath, item.DisplayName, positions);
         }
 

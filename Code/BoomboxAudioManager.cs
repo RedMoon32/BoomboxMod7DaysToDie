@@ -76,6 +76,15 @@ namespace Boombox
 
         public static IReadOnlyList<string> AvailableClips => ClipNames;
 
+        public static void RefreshLocalMusicLibrary()
+        {
+            lock (ClipCacheSyncRoot)
+            {
+                cachedLocalMusicTracks = null;
+                cachedClipNames = null;
+            }
+        }
+
         public static void RegisterBoombox(World world, Vector3i position)
         {
             if (world == null || !IsServer())
