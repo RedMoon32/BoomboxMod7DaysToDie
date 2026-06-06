@@ -7,6 +7,7 @@ namespace Boombox
     {
         private static readonly BlockActivationCommand PlayCommand = new BlockActivationCommand("boombox_play_toggle", "hand", true, false, "toggle");
         private static readonly BlockActivationCommand PickupCommand = new BlockActivationCommand("boombox_pickup", "hand", true, false, "pickup");
+        private static readonly BlockActivationCommand MenuCommand = new BlockActivationCommand("boombox_menu", "pen", true, false, "edit");
 
         private static bool IsClient => !GameManager.IsDedicatedServer;
         private static bool IsServer => GameManager.IsDedicatedServer || SingletonMonoBehaviour<ConnectionManager>.Instance.IsServer;
@@ -78,11 +79,17 @@ namespace Boombox
                 return new[] { PickupCommand };
             }
 
-            return new[] { PlayCommand };
+            return new[] { MenuCommand, PlayCommand };
         }
 
         public override bool OnBlockActivated(string command, WorldBase world, int clrIdx, Vector3i blockPos, BlockValue blockValue, EntityPlayerLocal player)
         {
+            if (command == "boombox_menu")
+            {
+                OpenMenu(blockPos, clrIdx, player);
+                return true;
+            }
+
             HandleActivation(world, clrIdx, blockPos, player);
             return true;
         }
@@ -145,6 +152,29 @@ namespace Boombox
             {
                 BoomboxAudioManager.RegisterBoombox(world, blockPos);
             }
+        }
+
+        private static void OpenMenu(Vector3i blockPos, int clrIdx, EntityPlayerLocal player)
+        {
+            if (player?.PlayerUI?.xui == null)
+            {
+                return;
+            }
+
+            XUiC_BoomboxControlWindow.BlockPosition = blockPos;
+            XUiC_BoomboxControlWindow.ClrIdx = clrIdx;
+            XUiC_BoomboxControlWindow.Player = player;
+
+            var xui = player.PlayerUI.xui;
+            var window = xui.GetWindow("windowBoomboxControl");
+            if (window == null || ((XUiView)window).Controller == null)
+            {
+                Debug.LogWarning("[Boombox] Control window is not available");
+                GameManager.ShowTooltip(player, "Boombox menu is not available", string.Empty, "ui_denied", null, false, false, 0f);
+                return;
+            }
+
+            player.PlayerUI.windowManager.Open("windowBoomboxControl", true, false, true);
         }
     }
 }

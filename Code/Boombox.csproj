@@ -15,5 +15,6 @@
     <Reference Include="UnityEngine.AudioModule" HintPath="..\..\..\7DaysToDie_Data\Managed\UnityEngine.AudioModule.dll" />
     <Reference Include="UnityEngine.UnityWebRequestAudioModule" HintPath="..\..\..\7DaysToDie_Data\Managed\UnityEngine.UnityWebRequestAudioModule.dll" />
     <Reference Include="UnityEngine.UnityWebRequestModule" HintPath="..\..\..\7DaysToDie_Data\Managed\UnityEngine.UnityWebRequestModule.dll" />
+    <Reference Include="NGUI" HintPath="..\..\..\7DaysToDie_Data\Managed\NGUI.dll" />
   </ItemGroup>
 </Project>

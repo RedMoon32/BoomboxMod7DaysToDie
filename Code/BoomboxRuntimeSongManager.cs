@@ -40,37 +40,79 @@ namespace Boombox
             var message = data.Message ?? string.Empty;
             if (message.StartsWith(VolumeChatPrefix, StringComparison.OrdinalIgnoreCase))
             {
-                return ServerHandleVolumeChatMessage(message.Substring(VolumeChatPrefix.Length).Trim());
+                if (TryParseVolume(message.Substring(VolumeChatPrefix.Length).Trim(), out var volume))
+                {
+                    BoomboxCommandService.ExecuteServer(new BoomboxCommandRequest { Type = BoomboxCommandType.SetVolume, Source = BoomboxCommandSource.Chat, Value = volume }, GameManager.Instance?.World, data.ClientInfo, GetSenderPlayer(data.SenderEntityId), data.SenderEntityId);
+                }
+                else
+                {
+                    Debug.LogWarning($"[Boombox] BVOL ignored (expected 0..5 or 0..500): '{message.Substring(VolumeChatPrefix.Length).Trim()}'");
+                }
+
+                return ModEvents.EModEventResult.StopHandlersAndVanilla;
             }
 
             if (message.StartsWith(SearchChatPrefix, StringComparison.OrdinalIgnoreCase))
             {
-                return ServerHandleSearchChatMessage(message.Substring(SearchChatPrefix.Length).Trim(), ref data);
+                BoomboxCommandService.ExecuteServer(new BoomboxCommandRequest { Type = BoomboxCommandType.SearchOnline, Source = BoomboxCommandSource.Chat, Text = message.Substring(SearchChatPrefix.Length).Trim() }, GameManager.Instance?.World, data.ClientInfo, GetSenderPlayer(data.SenderEntityId), data.SenderEntityId);
+                return ModEvents.EModEventResult.StopHandlersAndVanilla;
             }
 
             if (message.StartsWith(QueueAddNumberChatPrefix, StringComparison.OrdinalIgnoreCase))
             {
-                return ServerHandleQueueAddNumberChatMessage(message.Substring(QueueAddNumberChatPrefix.Length).Trim(), ref data);
+                var value = message.Substring(QueueAddNumberChatPrefix.Length).Trim();
+                if (int.TryParse(value, out var number))
+                {
+                    BoomboxCommandService.ExecuteServer(new BoomboxCommandRequest { Type = BoomboxCommandType.QueueSearchResult, Source = BoomboxCommandSource.Chat, Number = number }, GameManager.Instance?.World, data.ClientInfo, GetSenderPlayer(data.SenderEntityId), data.SenderEntityId);
+                }
+                else
+                {
+                    SendReply(data.ClientInfo, data.SenderEntityId, "Usage: QUEUEADDNUM <number>");
+                }
+
+                return ModEvents.EModEventResult.StopHandlersAndVanilla;
             }
 
             if (message.StartsWith(QueueAddChatPrefix, StringComparison.OrdinalIgnoreCase))
             {
-                return ServerHandleQueueAddChatMessage(message.Substring(QueueAddChatPrefix.Length).Trim(), ref data);
+                BoomboxCommandService.ExecuteServer(new BoomboxCommandRequest { Type = BoomboxCommandType.QueueOnline, Source = BoomboxCommandSource.Chat, Text = message.Substring(QueueAddChatPrefix.Length).Trim() }, GameManager.Instance?.World, data.ClientInfo, GetSenderPlayer(data.SenderEntityId), data.SenderEntityId);
+                return ModEvents.EModEventResult.StopHandlersAndVanilla;
             }
 
             if (message.StartsWith(PreDelayChatPrefix, StringComparison.OrdinalIgnoreCase))
             {
-                return ServerHandlePreDelayChatMessage(message.Substring(PreDelayChatPrefix.Length).Trim(), ref data);
+                var value = message.Substring(PreDelayChatPrefix.Length).Trim();
+                if (TryParseSeconds(value, out var seconds))
+                {
+                    BoomboxCommandService.ExecuteServer(new BoomboxCommandRequest { Type = BoomboxCommandType.SetPreDelay, Source = BoomboxCommandSource.Chat, Value = seconds }, GameManager.Instance?.World, data.ClientInfo, GetSenderPlayer(data.SenderEntityId), data.SenderEntityId);
+                }
+                else
+                {
+                    SendReply(data.ClientInfo, data.SenderEntityId, $"Usage: SETPREDELAY <seconds 0..{MaxPreDelaySeconds:0}>");
+                }
+
+                return ModEvents.EModEventResult.StopHandlersAndVanilla;
             }
 
             if (message.StartsWith(PlayNumberChatPrefix, StringComparison.OrdinalIgnoreCase))
             {
-                return ServerHandlePlayNumberChatMessage(message.Substring(PlayNumberChatPrefix.Length).Trim(), ref data);
+                var value = message.Substring(PlayNumberChatPrefix.Length).Trim();
+                if (int.TryParse(value, out var number))
+                {
+                    BoomboxCommandService.ExecuteServer(new BoomboxCommandRequest { Type = BoomboxCommandType.PlaySearchResult, Source = BoomboxCommandSource.Chat, Number = number }, GameManager.Instance?.World, data.ClientInfo, GetSenderPlayer(data.SenderEntityId), data.SenderEntityId);
+                }
+                else
+                {
+                    SendReply(data.ClientInfo, data.SenderEntityId, "Usage: PLAYNUM <number>");
+                }
+
+                return ModEvents.EModEventResult.StopHandlersAndVanilla;
             }
 
             if (message.StartsWith(YoutubeChatPrefix, StringComparison.OrdinalIgnoreCase))
             {
-                return ServerHandleYoutubeChatMessage(message.Substring(YoutubeChatPrefix.Length).Trim(), ref data);
+                BoomboxCommandService.ExecuteServer(new BoomboxCommandRequest { Type = BoomboxCommandType.PlayOnline, Source = BoomboxCommandSource.Chat, Text = message.Substring(YoutubeChatPrefix.Length).Trim() }, GameManager.Instance?.World, data.ClientInfo, GetSenderPlayer(data.SenderEntityId), data.SenderEntityId);
+                return ModEvents.EModEventResult.StopHandlersAndVanilla;
             }
 
             if (!message.StartsWith(ChatPrefix, StringComparison.OrdinalIgnoreCase))
@@ -78,33 +120,203 @@ namespace Boombox
                 return ModEvents.EModEventResult.Continue;
             }
 
-            if (!IsServer())
-            {
-                return ModEvents.EModEventResult.StopHandlersAndVanilla;
-            }
+            var songName = message.Substring(ChatPrefix.Length).Trim();
+            BoomboxCommandService.ExecuteServer(new BoomboxCommandRequest { Type = BoomboxCommandType.PlayLocal, Source = BoomboxCommandSource.Chat, Text = songName }, GameManager.Instance?.World, data.ClientInfo, GetSenderPlayer(data.SenderEntityId), data.SenderEntityId);
+            return ModEvents.EModEventResult.StopHandlersAndVanilla;
+        }
 
-            if (!TryGetServerPlaybackContext("PLAY", out var positions, out var gameManager))
+        public static bool ServerPlayLocal(string songName, ClientInfo clientInfo, int senderEntityId)
+        {
+            if (!IsServer() || !TryGetServerPlaybackContext("PLAY", out var positions, out var gameManager))
             {
-                return ModEvents.EModEventResult.StopHandlersAndVanilla;
+                return false;
             }
 
             ClearServerQueue("PLAY command");
-            var songName = message.Substring(ChatPrefix.Length).Trim();
             if (!TryResolveSongPath(songName, out var songPath, out var normalizedName))
             {
                 Debug.LogWarning($"[Boombox] PLAY ignored (song not found or invalid): '{songName}'");
-                return ModEvents.EModEventResult.StopHandlersAndVanilla;
+                SendReply(clientInfo, senderEntityId, $"Song not found: {songName}");
+                return false;
             }
 
             var world = GameManager.Instance?.World;
-            var instigator = world?.GetEntity(data.SenderEntityId) as EntityPlayer;
+            var instigator = world?.GetEntity(senderEntityId) as EntityPlayer;
             if (BoomboxAudioManager.ServerPlayLocalMusicFile(world, positions, songPath, instigator))
             {
-                return ModEvents.EModEventResult.StopHandlersAndVanilla;
+                return true;
             }
 
             gameManager.StartCoroutine(ServerTransferSongRoutine(songPath, normalizedName, positions));
-            return ModEvents.EModEventResult.StopHandlersAndVanilla;
+            return true;
+        }
+
+        public static bool ServerPlayOnline(string query, ClientInfo clientInfo, int senderEntityId)
+        {
+            if (!IsServer())
+            {
+                return false;
+            }
+
+            if (string.IsNullOrWhiteSpace(query))
+            {
+                Debug.LogWarning("[Boombox] PLAYU ignored (empty query)");
+                SendReply(clientInfo, senderEntityId, "Usage: PLAYU <query>");
+                return false;
+            }
+
+            if (!TryGetServerPlaybackContext("PLAYU", out var positions, out var gameManager))
+            {
+                return false;
+            }
+
+            ClearServerQueue("PLAYU command");
+            gameManager.StartCoroutine(ServerDownloadAndTransferRoutine(query, positions, clientInfo, senderEntityId));
+            return true;
+        }
+
+        public static bool ServerSearchOnline(string query, ClientInfo clientInfo, int senderEntityId)
+        {
+            if (!IsServer())
+            {
+                return false;
+            }
+
+            if (string.IsNullOrWhiteSpace(query))
+            {
+                SendReply(clientInfo, senderEntityId, "Usage: SEARCH <query>");
+                return false;
+            }
+
+            var gameManager = GameManager.Instance;
+            if (gameManager == null)
+            {
+                Debug.LogWarning("[Boombox] SEARCH ignored (game manager missing)");
+                return false;
+            }
+
+            gameManager.StartCoroutine(ServerSearchRoutine(query, GetSearchSessionKey(clientInfo, senderEntityId), clientInfo, senderEntityId));
+            return true;
+        }
+
+        public static bool ServerPlaySearchResult(int number, ClientInfo clientInfo, int senderEntityId)
+        {
+            if (!IsServer())
+            {
+                return false;
+            }
+
+            if (number < 1)
+            {
+                SendReply(clientInfo, senderEntityId, "Usage: PLAYNUM <number>");
+                return false;
+            }
+
+            if (!TryGetServerPlaybackContext("PLAYNUM", out var positions, out var gameManager))
+            {
+                return false;
+            }
+
+            if (!TryGetSearchSession(clientInfo, senderEntityId, out var session))
+            {
+                SendReply(clientInfo, senderEntityId, "No SEARCH results cached. Use SEARCH <query> first.");
+                return false;
+            }
+
+            if (number > session.Items.Count)
+            {
+                SendReply(clientInfo, senderEntityId, $"PLAYNUM {number} is out of range. Last SEARCH has {session.Items.Count} result(s).");
+                return false;
+            }
+
+            ClearServerQueue("PLAYNUM command");
+            gameManager.StartCoroutine(ServerDownloadSearchResultAndTransferRoutine(session.Items[number - 1], positions, clientInfo, senderEntityId));
+            return true;
+        }
+
+        public static bool ServerQueueOnline(string query, ClientInfo clientInfo, int senderEntityId)
+        {
+            if (!IsServer())
+            {
+                return false;
+            }
+
+            if (string.IsNullOrWhiteSpace(query))
+            {
+                SendReply(clientInfo, senderEntityId, "Usage: QUEUEADD <query>");
+                return false;
+            }
+
+            var gameManager = GameManager.Instance;
+            if (gameManager == null)
+            {
+                Debug.LogWarning("[Boombox] QUEUEADD ignored (game manager missing)");
+                return false;
+            }
+
+            gameManager.StartCoroutine(ServerQueueAddRoutine(query, clientInfo, senderEntityId));
+            return true;
+        }
+
+        public static bool ServerQueueSearchResult(int number, ClientInfo clientInfo, int senderEntityId)
+        {
+            if (!IsServer())
+            {
+                return false;
+            }
+
+            if (number < 1)
+            {
+                SendReply(clientInfo, senderEntityId, "Usage: QUEUEADDNUM <number>");
+                return false;
+            }
+
+            if (!TryGetSearchSession(clientInfo, senderEntityId, out var session))
+            {
+                SendReply(clientInfo, senderEntityId, "No SEARCH results cached. Use SEARCH <query> first.");
+                return false;
+            }
+
+            if (number > session.Items.Count)
+            {
+                SendReply(clientInfo, senderEntityId, $"QUEUEADDNUM {number} is out of range. Last SEARCH has {session.Items.Count} result(s).");
+                return false;
+            }
+
+            var gameManager = GameManager.Instance;
+            if (gameManager == null)
+            {
+                Debug.LogWarning("[Boombox] QUEUEADDNUM ignored (game manager missing)");
+                return false;
+            }
+
+            gameManager.StartCoroutine(ServerQueueAddSearchResultRoutine(session.Items[number - 1], clientInfo, senderEntityId));
+            return true;
+        }
+
+        public static bool ServerSetVolume(float volume, ClientInfo clientInfo, int senderEntityId)
+        {
+            if (!IsServer())
+            {
+                return false;
+            }
+
+            BoomboxAudioManager.ServerSetVolume(volume);
+            SendReply(clientInfo, senderEntityId, $"Volume set to {Mathf.Clamp(volume, 0f, 5f):0.##}");
+            return true;
+        }
+
+        public static bool ServerSetPreDelay(float seconds, ClientInfo clientInfo, int senderEntityId)
+        {
+            if (!IsServer())
+            {
+                return false;
+            }
+
+            ServerPreDelaySeconds = Mathf.Clamp(seconds, 0f, MaxPreDelaySeconds);
+            SendReply(clientInfo, senderEntityId, $"Runtime song pre-delay set to {ServerPreDelaySeconds:0.##}s");
+            Debug.Log($"[Boombox] Runtime song pre-delay set to {ServerPreDelaySeconds:0.##}s");
+            return true;
         }
 
         private static ModEvents.EModEventResult ServerHandleVolumeChatMessage(string value)
@@ -501,8 +713,8 @@ namespace Boombox
                 .GetPackage<NetPackageBoomboxSongStart>()
                 .Setup(songId, songName, extension, bytes.Length, positions, notifyServerOnFinished, finishedClipName);
 
-            BroadcastToClients(start);
-            if (!GameManager.IsDedicatedServer)
+            var sentStart = BroadcastToClients(start);
+            if (!GameManager.IsDedicatedServer && !sentStart)
             {
                 ClientReceiveSongStart(songId, songName, extension, bytes.Length, positions, notifyServerOnFinished, finishedClipName);
             }
@@ -519,8 +731,8 @@ namespace Boombox
                     .GetPackage<NetPackageBoomboxSongChunk>()
                     .Setup(songId, chunkIndex, chunk);
 
-                BroadcastToClients(package);
-                if (!GameManager.IsDedicatedServer)
+                var sentChunk = BroadcastToClients(package);
+                if (!GameManager.IsDedicatedServer && !sentChunk)
                 {
                     ClientReceiveSongChunk(songId, chunkIndex, chunk);
                 }
@@ -545,8 +757,8 @@ namespace Boombox
                 .GetPackage<NetPackageBoomboxSongComplete>()
                 .Setup(songId, scheduledStartUtcTicks);
 
-            BroadcastToClients(complete);
-            if (!GameManager.IsDedicatedServer)
+            var sentComplete = BroadcastToClients(complete);
+            if (!GameManager.IsDedicatedServer && !sentComplete)
             {
                 ClientReceiveSongComplete(songId, scheduledStartUtcTicks);
             }
@@ -820,10 +1032,16 @@ namespace Boombox
             return false;
         }
 
-        private static void BroadcastToClients(NetPackage package)
+        private static bool BroadcastToClients(NetPackage package)
         {
             var connection = SingletonMonoBehaviour<ConnectionManager>.Instance;
-            connection?.SendPackage(package, false, -1, -1, -1, null, -1, false);
+            if (connection == null)
+            {
+                return false;
+            }
+
+            connection.SendPackage(package, false, -1, -1, -1, null, -1, false);
+            return true;
         }
 
         private static bool IsServer()
@@ -1028,6 +1246,35 @@ namespace Boombox
             }
 
             return "entity:" + data.SenderEntityId;
+        }
+
+        private static string GetSearchSessionKey(ClientInfo clientInfo, int senderEntityId)
+        {
+            if (clientInfo != null)
+            {
+                return clientInfo.ToString();
+            }
+
+            return "entity:" + senderEntityId;
+        }
+
+        private static bool TryGetSearchSession(ClientInfo clientInfo, int senderEntityId, out SearchSession session)
+        {
+            return SearchSessions.TryGetValue(GetSearchSessionKey(clientInfo, senderEntityId), out session) &&
+                   session != null &&
+                   session.Items != null &&
+                   session.Items.Count > 0;
+        }
+
+        private static EntityPlayer GetSenderPlayer(int senderEntityId)
+        {
+            var world = GameManager.Instance?.World;
+            return world?.GetEntity(senderEntityId) as EntityPlayer;
+        }
+
+        public static void SendReply(ClientInfo clientInfo, int recipientEntityId, string message)
+        {
+            SendChatReply(clientInfo, recipientEntityId, message);
         }
 
         private static void SendSearchResults(ClientInfo clientInfo, int senderEntityId, string query, List<MusicSearchItem> items)

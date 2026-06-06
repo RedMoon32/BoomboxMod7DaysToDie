@@ -1,0 +1,38 @@
+<config>
+  <append xpath="/windows">
+    <window name="windowBoomboxControl" width="760" height="470" panel="center" cursor_area="true" controller="Boombox.XUiC_BoomboxControlWindow, Boombox">
+      <rect name="mainRect" depth="0" pos="0,0" width="760" height="470">
+        <sprite depth="0" name="background" sprite="menu_empty_background" color="[black]" type="sliced" fillcenter="true" />
+
+        <label depth="1" name="lblTitle" pos="0,218" width="760" height="34" text="Boombox" font_size="30" justify="center" />
+
+        <label depth="1" name="lblQuery" pos="24,166" width="220" height="28" text="Song / search" font_size="22" />
+        <textfield depth="1" name="txtBoomboxQuery" pos="24,128" width="520" height="38" character_limit="512" focus_on_open="true" clear_on_open="false" open_vk_on_open="false" />
+        <button depth="1" name="btnBoomboxSearch" pos="562,128" width="82" height="38" text="Search" font_size="20" style="press, hover" sound="[craft_click]" />
+        <button depth="1" name="btnBoomboxPlayOnline" pos="654,128" width="82" height="38" text="Play" font_size="20" style="press, hover" sound="[craft_click]" />
+
+        <button depth="1" name="btnBoomboxPlayLocal" pos="24,78" width="156" height="38" text="Play local" font_size="20" style="press, hover" sound="[craft_click]" />
+        <button depth="1" name="btnBoomboxQueue" pos="192,78" width="156" height="38" text="Queue query" font_size="20" style="press, hover" sound="[craft_click]" />
+        <button depth="1" name="btnBoomboxClearQueue" pos="360,78" width="156" height="38" text="Clear queue" font_size="20" style="press, hover" sound="[craft_click]" />
+        <button depth="1" name="btnBoomboxToggle" pos="528,78" width="156" height="38" text="Play / Stop" font_size="20" style="press, hover" sound="[craft_click]" />
+
+        <label depth="1" name="lblNumber" pos="24,18" width="180" height="28" text="Search result #" font_size="22" />
+        <textfield depth="1" name="txtBoomboxNumber" pos="204,20" width="80" height="38" character_limit="4" clear_on_open="false" open_vk_on_open="false" />
+        <button depth="1" name="btnBoomboxPlayNumber" pos="300,20" width="120" height="38" text="Play #" font_size="20" style="press, hover" sound="[craft_click]" />
+        <button depth="1" name="btnBoomboxQueueNumber" pos="432,20" width="120" height="38" text="Queue #" font_size="20" style="press, hover" sound="[craft_click]" />
+
+        <label depth="1" name="lblVolume" pos="24,-48" width="96" height="28" text="Volume" font_size="22" />
+        <textfield depth="1" name="txtBoomboxVolume" pos="124,-46" width="96" height="38" character_limit="8" clear_on_open="false" open_vk_on_open="false" />
+        <button depth="1" name="btnBoomboxVolume" pos="232,-46" width="104" height="38" text="Set" font_size="20" style="press, hover" sound="[craft_click]" />
+
+        <label depth="1" name="lblPreDelay" pos="372,-48" width="110" height="28" text="Pre-delay" font_size="22" />
+        <textfield depth="1" name="txtBoomboxPreDelay" pos="492,-46" width="96" height="38" character_limit="8" clear_on_open="false" open_vk_on_open="false" />
+        <button depth="1" name="btnBoomboxPreDelay" pos="600,-46" width="104" height="38" text="Set" font_size="20" style="press, hover" sound="[craft_click]" />
+
+        <button depth="1" name="btnBoomboxPickup" pos="24,-122" width="156" height="38" text="Pick up" font_size="20" style="press, hover" sound="[craft_click]" />
+        <label depth="1" name="lblHint" pos="196,-122" width="360" height="38" text="Search results are shown in chat." font_size="20" justify="center" />
+        <button depth="1" name="btnBoomboxClose" pos="580,-122" width="124" height="38" text="Close" font_size="20" style="press, hover" sound="[craft_click]" />
+      </rect>
+    </window>
+  </append>
+</config>
