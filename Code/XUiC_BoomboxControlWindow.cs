@@ -37,13 +37,11 @@ namespace Boombox
         public override void Init()
         {
             base.Init();
-            Debug.Log("[Boombox] UI control window initialized");
         }
 
         public override void OnOpen()
         {
             base.OnOpen();
-            Debug.Log("[Boombox] UI control window opened");
             ActiveWindow = this;
             BindControls();
             RegisterHandlers();
@@ -207,14 +205,7 @@ namespace Boombox
                 handler(sender, mouseButton);
             };
 
-            if (button is XUiC_SimpleButton simpleButton)
-            {
-                simpleButton.OnPressed += wrappedHandler;
-            }
-            else
-            {
-                button.OnPress += wrappedHandler;
-            }
+            button.OnPress += wrappedHandler;
 
             if (clickable != null && clickable != button)
             {
