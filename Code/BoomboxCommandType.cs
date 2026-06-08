@@ -12,6 +12,7 @@ namespace Boombox
         SetPreDelay = 7,
         ToggleBlock = 8,
         PickupBlock = 9,
-        ClearQueue = 10
+        ClearQueue = 10,
+        Stop = 11
     }
 }

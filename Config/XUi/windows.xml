@@ -1,37 +1,97 @@
 <config>
   <append xpath="/windows">
-    <window name="windowBoomboxControl" width="760" height="470" panel="center" cursor_area="true" controller="Boombox.XUiC_BoomboxControlWindow, Boombox">
-      <rect name="mainRect" depth="0" pos="0,0" width="760" height="470">
+    <window name="windowBoomboxControl" width="760" height="560" panel="center" cursor_area="true" controller="Boombox.XUiC_BoomboxControlWindow, Boombox">
+      <rect name="mainRect" depth="0" pos="0,0" width="760" height="560">
         <sprite depth="0" name="background" sprite="menu_empty_background" color="[black]" type="sliced" fillcenter="true" />
 
-        <label depth="1" name="lblTitle" pos="0,218" width="760" height="34" text="Boombox" font_size="30" justify="center" />
+        <label depth="1" name="lblTitle" pos="0,260" width="760" height="38" text="Boombox" font_size="32" justify="center" />
 
-        <label depth="1" name="lblQuery" pos="24,166" width="220" height="28" text="Song / search" font_size="22" />
-        <textfield depth="1" name="txtBoomboxQuery" pos="24,128" width="520" height="38" character_limit="512" focus_on_open="true" clear_on_open="false" open_vk_on_open="false" />
-        <button depth="1" name="btnBoomboxSearch" pos="562,128" width="82" height="38" text="Search" font_size="20" style="press, hover" sound="[craft_click]" />
-        <button depth="1" name="btnBoomboxPlayOnline" pos="654,128" width="82" height="38" text="Play" font_size="20" style="press, hover" sound="[craft_click]" />
+        <rect depth="1" name="panelMain" pos="0,0" width="760" height="460">
+          <simplebutton name="btnMainSearch" depth="2" pos="250,125" width="260" height="52" font_size="28" caption="Search" />
+          <simplebutton name="btnMainStop" depth="2" pos="250,45" width="260" height="52" font_size="28" caption="Stop" />
+          <simplebutton name="btnMainLocal" depth="2" pos="250,-35" width="260" height="52" font_size="28" caption="Play local" />
+          <simplebutton name="btnMainClose" depth="2" pos="300,-170" width="160" height="40" font_size="22" caption="Close" />
+        </rect>
 
-        <button depth="1" name="btnBoomboxPlayLocal" pos="24,78" width="156" height="38" text="Play local" font_size="20" style="press, hover" sound="[craft_click]" />
-        <button depth="1" name="btnBoomboxQueue" pos="192,78" width="156" height="38" text="Queue query" font_size="20" style="press, hover" sound="[craft_click]" />
-        <button depth="1" name="btnBoomboxClearQueue" pos="360,78" width="156" height="38" text="Clear queue" font_size="20" style="press, hover" sound="[craft_click]" />
-        <button depth="1" name="btnBoomboxToggle" pos="528,78" width="156" height="38" text="Play / Stop" font_size="20" style="press, hover" sound="[craft_click]" />
+        <rect depth="1" name="panelSearch" pos="0,0" width="760" height="460" visible="false">
+          <simplebutton name="btnSearchBack" depth="2" pos="24,210" width="100" height="36" font_size="20" caption="Back" />
+          <label depth="2" name="lblSearchTitle" pos="134,213" width="500" height="30" text="Search music" font_size="24" justify="center" />
 
-        <label depth="1" name="lblNumber" pos="24,18" width="180" height="28" text="Search result #" font_size="22" />
-        <textfield depth="1" name="txtBoomboxNumber" pos="204,20" width="80" height="38" character_limit="4" clear_on_open="false" open_vk_on_open="false" />
-        <button depth="1" name="btnBoomboxPlayNumber" pos="300,20" width="120" height="38" text="Play #" font_size="20" style="press, hover" sound="[craft_click]" />
-        <button depth="1" name="btnBoomboxQueueNumber" pos="432,20" width="120" height="38" text="Queue #" font_size="20" style="press, hover" sound="[craft_click]" />
+          <textfield depth="2" name="txtSearchQuery" pos="24,162" width="566" height="40" character_limit="512" focus_on_open="false" clear_on_open="false" open_vk_on_open="false" />
+          <simplebutton name="btnSearchSubmit" depth="2" pos="608,162" width="128" height="40" font_size="22" caption="Search" />
 
-        <label depth="1" name="lblVolume" pos="24,-48" width="96" height="28" text="Volume" font_size="22" />
-        <textfield depth="1" name="txtBoomboxVolume" pos="124,-46" width="96" height="38" character_limit="8" clear_on_open="false" open_vk_on_open="false" />
-        <button depth="1" name="btnBoomboxVolume" pos="232,-46" width="104" height="38" text="Set" font_size="20" style="press, hover" sound="[craft_click]" />
+          <label depth="2" name="lblSearchStatus" pos="24,118" width="712" height="28" text="" font_size="20" justify="center" />
 
-        <label depth="1" name="lblPreDelay" pos="372,-48" width="110" height="28" text="Pre-delay" font_size="22" />
-        <textfield depth="1" name="txtBoomboxPreDelay" pos="492,-46" width="96" height="38" character_limit="8" clear_on_open="false" open_vk_on_open="false" />
-        <button depth="1" name="btnBoomboxPreDelay" pos="600,-46" width="104" height="38" text="Set" font_size="20" style="press, hover" sound="[craft_click]" />
+          <rect depth="2" name="searchResultRow0" pos="24,78" width="712" height="34" visible="false">
+            <label depth="3" name="lblResultTitle0" pos="8,3" width="410" height="24" text="" font_size="18" />
+            <label depth="3" name="lblResultMeta0" pos="420,3" width="110" height="24" text="" font_size="16" />
+            <simplebutton name="btnResultPlay0" depth="3" pos="540,0" width="72" height="30" font_size="16" caption="Play" />
+            <simplebutton name="btnResultNext0" depth="3" pos="620,0" width="88" height="30" font_size="16" caption="Next" />
+          </rect>
+          <rect depth="2" name="searchResultRow1" pos="24,40" width="712" height="34" visible="false">
+            <label depth="3" name="lblResultTitle1" pos="8,3" width="410" height="24" text="" font_size="18" />
+            <label depth="3" name="lblResultMeta1" pos="420,3" width="110" height="24" text="" font_size="16" />
+            <simplebutton name="btnResultPlay1" depth="3" pos="540,0" width="72" height="30" font_size="16" caption="Play" />
+            <simplebutton name="btnResultNext1" depth="3" pos="620,0" width="88" height="30" font_size="16" caption="Next" />
+          </rect>
+          <rect depth="2" name="searchResultRow2" pos="24,2" width="712" height="34" visible="false">
+            <label depth="3" name="lblResultTitle2" pos="8,3" width="410" height="24" text="" font_size="18" />
+            <label depth="3" name="lblResultMeta2" pos="420,3" width="110" height="24" text="" font_size="16" />
+            <simplebutton name="btnResultPlay2" depth="3" pos="540,0" width="72" height="30" font_size="16" caption="Play" />
+            <simplebutton name="btnResultNext2" depth="3" pos="620,0" width="88" height="30" font_size="16" caption="Next" />
+          </rect>
+          <rect depth="2" name="searchResultRow3" pos="24,-36" width="712" height="34" visible="false">
+            <label depth="3" name="lblResultTitle3" pos="8,3" width="410" height="24" text="" font_size="18" />
+            <label depth="3" name="lblResultMeta3" pos="420,3" width="110" height="24" text="" font_size="16" />
+            <simplebutton name="btnResultPlay3" depth="3" pos="540,0" width="72" height="30" font_size="16" caption="Play" />
+            <simplebutton name="btnResultNext3" depth="3" pos="620,0" width="88" height="30" font_size="16" caption="Next" />
+          </rect>
+          <rect depth="2" name="searchResultRow4" pos="24,-74" width="712" height="34" visible="false">
+            <label depth="3" name="lblResultTitle4" pos="8,3" width="410" height="24" text="" font_size="18" />
+            <label depth="3" name="lblResultMeta4" pos="420,3" width="110" height="24" text="" font_size="16" />
+            <simplebutton name="btnResultPlay4" depth="3" pos="540,0" width="72" height="30" font_size="16" caption="Play" />
+            <simplebutton name="btnResultNext4" depth="3" pos="620,0" width="88" height="30" font_size="16" caption="Next" />
+          </rect>
+          <rect depth="2" name="searchResultRow5" pos="24,-112" width="712" height="34" visible="false">
+            <label depth="3" name="lblResultTitle5" pos="8,3" width="410" height="24" text="" font_size="18" />
+            <label depth="3" name="lblResultMeta5" pos="420,3" width="110" height="24" text="" font_size="16" />
+            <simplebutton name="btnResultPlay5" depth="3" pos="540,0" width="72" height="30" font_size="16" caption="Play" />
+            <simplebutton name="btnResultNext5" depth="3" pos="620,0" width="88" height="30" font_size="16" caption="Next" />
+          </rect>
+          <rect depth="2" name="searchResultRow6" pos="24,-150" width="712" height="34" visible="false">
+            <label depth="3" name="lblResultTitle6" pos="8,3" width="410" height="24" text="" font_size="18" />
+            <label depth="3" name="lblResultMeta6" pos="420,3" width="110" height="24" text="" font_size="16" />
+            <simplebutton name="btnResultPlay6" depth="3" pos="540,0" width="72" height="30" font_size="16" caption="Play" />
+            <simplebutton name="btnResultNext6" depth="3" pos="620,0" width="88" height="30" font_size="16" caption="Next" />
+          </rect>
+          <rect depth="2" name="searchResultRow7" pos="24,-188" width="712" height="34" visible="false">
+            <label depth="3" name="lblResultTitle7" pos="8,3" width="410" height="24" text="" font_size="18" />
+            <label depth="3" name="lblResultMeta7" pos="420,3" width="110" height="24" text="" font_size="16" />
+            <simplebutton name="btnResultPlay7" depth="3" pos="540,0" width="72" height="30" font_size="16" caption="Play" />
+            <simplebutton name="btnResultNext7" depth="3" pos="620,0" width="88" height="30" font_size="16" caption="Next" />
+          </rect>
+          <rect depth="2" name="searchResultRow8" pos="24,-226" width="712" height="34" visible="false">
+            <label depth="3" name="lblResultTitle8" pos="8,3" width="410" height="24" text="" font_size="18" />
+            <label depth="3" name="lblResultMeta8" pos="420,3" width="110" height="24" text="" font_size="16" />
+            <simplebutton name="btnResultPlay8" depth="3" pos="540,0" width="72" height="30" font_size="16" caption="Play" />
+            <simplebutton name="btnResultNext8" depth="3" pos="620,0" width="88" height="30" font_size="16" caption="Next" />
+          </rect>
+          <rect depth="2" name="searchResultRow9" pos="24,-264" width="712" height="34" visible="false">
+            <label depth="3" name="lblResultTitle9" pos="8,3" width="410" height="24" text="" font_size="18" />
+            <label depth="3" name="lblResultMeta9" pos="420,3" width="110" height="24" text="" font_size="16" />
+            <simplebutton name="btnResultPlay9" depth="3" pos="540,0" width="72" height="30" font_size="16" caption="Play" />
+            <simplebutton name="btnResultNext9" depth="3" pos="620,0" width="88" height="30" font_size="16" caption="Next" />
+          </rect>
+        </rect>
 
-        <button depth="1" name="btnBoomboxPickup" pos="24,-122" width="156" height="38" text="Pick up" font_size="20" style="press, hover" sound="[craft_click]" />
-        <label depth="1" name="lblHint" pos="196,-122" width="360" height="38" text="Search results are shown in chat." font_size="20" justify="center" />
-        <button depth="1" name="btnBoomboxClose" pos="580,-122" width="124" height="38" text="Close" font_size="20" style="press, hover" sound="[craft_click]" />
+        <rect depth="1" name="panelLocal" pos="0,0" width="760" height="460" visible="false">
+          <simplebutton name="btnLocalBack" depth="2" pos="24,210" width="100" height="36" font_size="20" caption="Back" />
+          <label depth="2" name="lblLocalTitle" pos="134,213" width="500" height="30" text="Play local" font_size="24" justify="center" />
+
+          <label depth="2" name="lblLocalHint" pos="24,135" width="712" height="30" text="Enter a local file name from Resources/MusicToPlay" font_size="20" justify="center" />
+          <textfield depth="2" name="txtLocalQuery" pos="78,78" width="470" height="42" character_limit="512" focus_on_open="false" clear_on_open="false" open_vk_on_open="false" />
+          <simplebutton name="btnLocalPlay" depth="2" pos="568,78" width="120" height="42" font_size="22" caption="Play" />
+        </rect>
       </rect>
     </window>
   </append>

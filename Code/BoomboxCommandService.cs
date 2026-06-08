@@ -39,6 +39,8 @@ namespace Boombox
                     BoomboxRuntimeSongManager.ClearServerQueue("ui command");
                     BoomboxRuntimeSongManager.SendReply(clientInfo, senderEntityId, "Queue cleared");
                     return true;
+                case BoomboxCommandType.Stop:
+                    return BoomboxRuntimeSongManager.ServerStop(clientInfo, senderEntityId);
                 default:
                     Debug.LogWarning($"[Boombox] Unsupported command type: {request.Type}");
                     return false;

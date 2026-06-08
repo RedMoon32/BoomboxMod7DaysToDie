@@ -317,6 +317,43 @@ namespace Boombox
             }
         }
 
+        public static int ServerStopPositions(World world, List<Vector3i> positions)
+        {
+            if (world == null || positions == null || !IsServer())
+            {
+                return 0;
+            }
+
+            var stopped = new List<KeyValuePair<Vector3i, BoomboxServerState>>();
+            lock (ServerSyncRoot)
+            {
+                foreach (var position in positions)
+                {
+                    if (!ServerStates.TryGetValue(position, out var state) || state == null || !state.IsPlaying)
+                    {
+                        continue;
+                    }
+
+                    state.IsPlaying = false;
+                    state.PlaybackToken++;
+                    ServerStates.Remove(position);
+                    stopped.Add(new KeyValuePair<Vector3i, BoomboxServerState>(position, state));
+                }
+            }
+
+            foreach (var entry in stopped)
+            {
+                StopNoiseLoop(entry.Value);
+                BroadcastStop(entry.Key);
+                if (!GameManager.IsDedicatedServer)
+                {
+                    ClientStop(entry.Key);
+                }
+            }
+
+            return stopped.Count;
+        }
+
         private static void ServerHandlePickup(World world, int clrIdx, Vector3i position, ClientInfo clientInfo, EntityPlayer player)
         {
             if (world == null)

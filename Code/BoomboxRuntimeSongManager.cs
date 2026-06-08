@@ -614,11 +614,13 @@ namespace Boombox
             if (!result.Success)
             {
                 Debug.LogWarning($"[Boombox] SEARCH failed downloader='{downloader.Name}' exit={result.ExitCode} query='{query}' error='{result.Error}' output='{Truncate(result.DiagnosticOutput, 1000)}'");
+                SendSearchResultsPackage(clientInfo, query, null, result.Error);
                 SendChatReply(clientInfo, senderEntityId, $"Search failed: {result.Error}");
                 yield break;
             }
 
             SearchSessions[sessionKey] = new SearchSession(query, downloader.Name, result.Items);
+            SendSearchResultsPackage(clientInfo, query, result.Items, string.Empty);
             SendSearchResults(clientInfo, senderEntityId, query, result.Items);
             Debug.Log($"[Boombox] SEARCH completed downloader='{downloader.Name}' query='{query}' results={result.Items.Count}");
         }
@@ -1277,6 +1279,20 @@ namespace Boombox
             SendChatReply(clientInfo, recipientEntityId, message);
         }
 
+        public static bool ServerStop(ClientInfo clientInfo, int senderEntityId)
+        {
+            if (!TryGetServerPlaybackContext("STOP", out var positions, out _))
+            {
+                return false;
+            }
+
+            var world = GameManager.Instance?.World;
+            var stopped = BoomboxAudioManager.ServerStopPositions(world, positions);
+            ClearServerQueue("stop command");
+            SendReply(clientInfo, senderEntityId, stopped > 0 ? "Stopped" : "Nothing is playing");
+            return true;
+        }
+
         private static void SendSearchResults(ClientInfo clientInfo, int senderEntityId, string query, List<MusicSearchItem> items)
         {
             if (items == null || items.Count == 0)
@@ -1291,6 +1307,32 @@ namespace Boombox
                 var item = items[i];
                 var duration = string.IsNullOrEmpty(item.Duration) ? string.Empty : " [" + item.Duration + "]";
                 SendChatReply(clientInfo, senderEntityId, $"{i + 1}. {item.DisplayName}{duration}");
+            }
+        }
+
+        private static void SendSearchResultsPackage(ClientInfo clientInfo, string query, List<MusicSearchItem> items, string error)
+        {
+            if (clientInfo == null)
+            {
+                if (!GameManager.IsDedicatedServer)
+                {
+                    XUiC_BoomboxControlWindow.ClientReceiveSearchResults(query, items, error);
+                }
+
+                return;
+            }
+
+            try
+            {
+                var package = NetPackageManager
+                    .GetPackage<NetPackageBoomboxSearchResults>()
+                    .Setup(query, items, error);
+
+                clientInfo.SendPackage(package);
+            }
+            catch (Exception ex)
+            {
+                Debug.LogWarning($"[Boombox] Failed to send search results package: {ex}");
             }
         }
 

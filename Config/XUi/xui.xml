@@ -1,6 +1,6 @@
 <config>
   <append xpath="//ruleset[@name='default']">
-    <window_group name="windowBoomboxControl" defaultSelected="txtBoomboxQuery">
+    <window_group name="windowBoomboxControl" defaultSelected="btnMainSearch">
       <window name="windowBoomboxControl" />
     </window_group>
   </append>
