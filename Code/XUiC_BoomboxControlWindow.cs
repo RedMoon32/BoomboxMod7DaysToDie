@@ -16,10 +16,8 @@ namespace Boombox
 
         private readonly List<MusicSearchItem> searchResults = new List<MusicSearchItem>();
         private XUiC_TextInput searchInput;
-        private XUiC_TextInput localInput;
         private XUiController panelMain;
         private XUiController panelSearch;
-        private XUiController panelLocal;
         private XUiController searchStatusLabel;
         private readonly XUiController[] resultRows = new XUiController[MaxSearchResults];
         private readonly XUiController[] resultTitleLabels = new XUiController[MaxSearchResults];
@@ -27,7 +25,6 @@ namespace Boombox
         private readonly HashSet<string> registeredButtonIds = new HashSet<string>();
         private string searchStatus = string.Empty;
         private bool searchInputHandlersRegistered;
-        private bool localInputHandlersRegistered;
 
         public static Vector3i BlockPosition { get; set; }
         public static int ClrIdx { get; set; }
@@ -58,7 +55,6 @@ namespace Boombox
             }
 
             SetSelected(searchInput, false);
-            SetSelected(localInput, false);
         }
 
         public static void ClientReceiveSearchResults(string query, List<MusicSearchItem> items, string error)
@@ -80,10 +76,8 @@ namespace Boombox
         {
             panelMain = GetChildById("panelMain");
             panelSearch = GetChildById("panelSearch");
-            panelLocal = GetChildById("panelLocal");
             searchStatusLabel = GetChildById("lblSearchStatus");
             searchInput = GetInput("txtSearchQuery");
-            localInput = GetInput("txtLocalQuery");
             for (var i = 0; i < MaxSearchResults; i++)
             {
                 resultRows[i] = GetChildById("searchResultRow" + i);
@@ -92,7 +86,6 @@ namespace Boombox
             }
 
             ConfigureInput(searchInput);
-            ConfigureInput(localInput);
             RenderRows();
         }
 
@@ -123,7 +116,7 @@ namespace Boombox
             }, ref registered, ref missing, ref skipped);
             RegisterButton("btnMainLocal", (sender, mouseButton) =>
             {
-                ShowLocalPanel();
+                Submit(BoomboxCommandType.ToggleBlock, string.Empty, 0);
             }, ref registered, ref missing, ref skipped);
             RegisterButton("btnMainClose", CloseButton_OnPress, ref registered, ref missing, ref skipped);
 
@@ -134,15 +127,6 @@ namespace Boombox
             RegisterButton("btnSearchSubmit", (sender, mouseButton) =>
             {
                 SubmitSearch();
-            }, ref registered, ref missing, ref skipped);
-
-            RegisterButton("btnLocalBack", (sender, mouseButton) =>
-            {
-                ShowMainPanel();
-            }, ref registered, ref missing, ref skipped);
-            RegisterButton("btnLocalPlay", (sender, mouseButton) =>
-            {
-                SubmitLocal();
             }, ref registered, ref missing, ref skipped);
 
             for (var i = 0; i < MaxSearchResults; i++)
@@ -165,14 +149,7 @@ namespace Boombox
                 searchInputHandlersRegistered = true;
             }
 
-            if (!localInputHandlersRegistered && localInput != null)
-            {
-                localInput.OnSubmitHandler += LocalInput_OnSubmitHandler;
-                localInput.OnInputAbortedHandler += Input_OnInputAbortedHandler;
-                localInputHandlersRegistered = true;
-            }
-
-            Debug.Log($"[Boombox] UI handler registration pass registered={registered} skipped={skipped} missing={missing} searchInputReady={searchInputHandlersRegistered} localInputReady={localInputHandlersRegistered}");
+            Debug.Log($"[Boombox] UI handler registration pass registered={registered} skipped={skipped} missing={missing} searchInputReady={searchInputHandlersRegistered}");
         }
 
         private void RegisterButton(string id, XUiEvent_OnPressEventHandler handler, ref int registered, ref int missing, ref int skipped)
@@ -222,11 +199,6 @@ namespace Boombox
             SubmitSearch();
         }
 
-        private void LocalInput_OnSubmitHandler(XUiController sender, string text)
-        {
-            SubmitLocal();
-        }
-
         private void Input_OnInputAbortedHandler(XUiController sender)
         {
             ShowMainPanel();
@@ -250,18 +222,6 @@ namespace Boombox
             searchStatus = "Searching...";
             RenderRows();
             Submit(BoomboxCommandType.SearchOnline, query, 0);
-        }
-
-        private void SubmitLocal()
-        {
-            var query = localInput?.Text?.Trim() ?? string.Empty;
-            if (string.IsNullOrWhiteSpace(query))
-            {
-                ShowTooltip("Enter a local file name");
-                return;
-            }
-
-            Submit(BoomboxCommandType.PlayLocal, query, 0);
         }
 
         private void Submit(BoomboxCommandType type, string text, int number)
@@ -327,30 +287,17 @@ namespace Boombox
         {
             SetVisible(panelMain, true);
             SetVisible(panelSearch, false);
-            SetVisible(panelLocal, false);
             SetSelected(searchInput, false);
-            SetSelected(localInput, false);
         }
 
         private void ShowSearchPanel(bool selectInput = true)
         {
             SetVisible(panelMain, false);
             SetVisible(panelSearch, true);
-            SetVisible(panelLocal, false);
-            SetSelected(localInput, false);
             if (selectInput)
             {
                 SetSelected(searchInput, true);
             }
-        }
-
-        private void ShowLocalPanel()
-        {
-            SetVisible(panelMain, false);
-            SetVisible(panelSearch, false);
-            SetVisible(panelLocal, true);
-            SetSelected(searchInput, false);
-            SetSelected(localInput, true);
         }
 
         private XUiC_TextInput GetInput(string id)

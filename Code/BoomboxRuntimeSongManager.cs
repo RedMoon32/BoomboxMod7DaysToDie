@@ -715,8 +715,8 @@ namespace Boombox
                 .GetPackage<NetPackageBoomboxSongStart>()
                 .Setup(songId, songName, extension, bytes.Length, positions, notifyServerOnFinished, finishedClipName);
 
-            var sentStart = BroadcastToClients(start);
-            if (!GameManager.IsDedicatedServer && !sentStart)
+            BroadcastToClients(start);
+            if (!GameManager.IsDedicatedServer)
             {
                 ClientReceiveSongStart(songId, songName, extension, bytes.Length, positions, notifyServerOnFinished, finishedClipName);
             }
@@ -733,8 +733,8 @@ namespace Boombox
                     .GetPackage<NetPackageBoomboxSongChunk>()
                     .Setup(songId, chunkIndex, chunk);
 
-                var sentChunk = BroadcastToClients(package);
-                if (!GameManager.IsDedicatedServer && !sentChunk)
+                BroadcastToClients(package);
+                if (!GameManager.IsDedicatedServer)
                 {
                     ClientReceiveSongChunk(songId, chunkIndex, chunk);
                 }
@@ -759,8 +759,8 @@ namespace Boombox
                 .GetPackage<NetPackageBoomboxSongComplete>()
                 .Setup(songId, scheduledStartUtcTicks);
 
-            var sentComplete = BroadcastToClients(complete);
-            if (!GameManager.IsDedicatedServer && !sentComplete)
+            BroadcastToClients(complete);
+            if (!GameManager.IsDedicatedServer)
             {
                 ClientReceiveSongComplete(songId, scheduledStartUtcTicks);
             }

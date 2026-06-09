@@ -83,15 +83,6 @@
             <simplebutton name="btnResultNext9" depth="3" pos="620,0" width="88" height="30" font_size="16" caption="Next" />
           </rect>
         </rect>
-
-        <rect depth="1" name="panelLocal" pos="0,0" width="760" height="460" visible="false">
-          <simplebutton name="btnLocalBack" depth="2" pos="24,210" width="100" height="36" font_size="20" caption="Back" />
-          <label depth="2" name="lblLocalTitle" pos="134,213" width="500" height="30" text="Play local" font_size="24" justify="center" />
-
-          <label depth="2" name="lblLocalHint" pos="24,135" width="712" height="30" text="Enter a local file name from Resources/MusicToPlay" font_size="20" justify="center" />
-          <textfield depth="2" name="txtLocalQuery" pos="78,78" width="470" height="42" character_limit="512" focus_on_open="false" clear_on_open="false" open_vk_on_open="false" />
-          <simplebutton name="btnLocalPlay" depth="2" pos="568,78" width="120" height="42" font_size="22" caption="Play" />
-        </rect>
       </rect>
     </window>
   </append>
