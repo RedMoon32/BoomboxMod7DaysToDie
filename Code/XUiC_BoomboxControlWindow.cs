@@ -16,8 +16,10 @@ namespace Boombox
 
         private readonly List<MusicSearchItem> searchResults = new List<MusicSearchItem>();
         private XUiC_TextInput searchInput;
+        private XUiC_TextInput volumeInput;
         private XUiController panelMain;
         private XUiController panelSearch;
+        private XUiController panelVolume;
         private XUiController searchStatusLabel;
         private readonly XUiController[] resultRows = new XUiController[MaxSearchResults];
         private readonly XUiController[] resultTitleLabels = new XUiController[MaxSearchResults];
@@ -25,6 +27,7 @@ namespace Boombox
         private readonly HashSet<string> registeredButtonIds = new HashSet<string>();
         private string searchStatus = string.Empty;
         private bool searchInputHandlersRegistered;
+        private bool volumeInputHandlersRegistered;
 
         public static Vector3i BlockPosition { get; set; }
         public static int ClrIdx { get; set; }
@@ -55,6 +58,7 @@ namespace Boombox
             }
 
             SetSelected(searchInput, false);
+            SetSelected(volumeInput, false);
         }
 
         public static void ClientReceiveSearchResults(string query, List<MusicSearchItem> items, string error)
@@ -76,8 +80,10 @@ namespace Boombox
         {
             panelMain = GetChildById("panelMain");
             panelSearch = GetChildById("panelSearch");
+            panelVolume = GetChildById("panelVolume");
             searchStatusLabel = GetChildById("lblSearchStatus");
             searchInput = GetInput("txtSearchQuery");
+            volumeInput = GetInput("txtVolume");
             for (var i = 0; i < MaxSearchResults; i++)
             {
                 resultRows[i] = GetChildById("searchResultRow" + i);
@@ -86,6 +92,7 @@ namespace Boombox
             }
 
             ConfigureInput(searchInput);
+            ConfigureInput(volumeInput);
             RenderRows();
         }
 
@@ -118,6 +125,10 @@ namespace Boombox
             {
                 Submit(BoomboxCommandType.ToggleBlock, string.Empty, 0);
             }, ref registered, ref missing, ref skipped);
+            RegisterButton("btnMainVolume", (sender, mouseButton) =>
+            {
+                ShowVolumePanel();
+            }, ref registered, ref missing, ref skipped);
             RegisterButton("btnMainClose", CloseButton_OnPress, ref registered, ref missing, ref skipped);
 
             RegisterButton("btnSearchBack", (sender, mouseButton) =>
@@ -127,6 +138,14 @@ namespace Boombox
             RegisterButton("btnSearchSubmit", (sender, mouseButton) =>
             {
                 SubmitSearch();
+            }, ref registered, ref missing, ref skipped);
+            RegisterButton("btnVolumeBack", (sender, mouseButton) =>
+            {
+                ShowMainPanel();
+            }, ref registered, ref missing, ref skipped);
+            RegisterButton("btnVolumeSet", (sender, mouseButton) =>
+            {
+                SubmitVolume();
             }, ref registered, ref missing, ref skipped);
 
             for (var i = 0; i < MaxSearchResults; i++)
@@ -149,7 +168,14 @@ namespace Boombox
                 searchInputHandlersRegistered = true;
             }
 
-            Debug.Log($"[Boombox] UI handler registration pass registered={registered} skipped={skipped} missing={missing} searchInputReady={searchInputHandlersRegistered}");
+            if (!volumeInputHandlersRegistered && volumeInput != null)
+            {
+                volumeInput.OnSubmitHandler += VolumeInput_OnSubmitHandler;
+                volumeInput.OnInputAbortedHandler += Input_OnInputAbortedHandler;
+                volumeInputHandlersRegistered = true;
+            }
+
+            Debug.Log($"[Boombox] UI handler registration pass registered={registered} skipped={skipped} missing={missing} searchInputReady={searchInputHandlersRegistered} volumeInputReady={volumeInputHandlersRegistered}");
         }
 
         private void RegisterButton(string id, XUiEvent_OnPressEventHandler handler, ref int registered, ref int missing, ref int skipped)
@@ -199,6 +225,11 @@ namespace Boombox
             SubmitSearch();
         }
 
+        private void VolumeInput_OnSubmitHandler(XUiController sender, string text)
+        {
+            SubmitVolume();
+        }
+
         private void Input_OnInputAbortedHandler(XUiController sender)
         {
             ShowMainPanel();
@@ -224,7 +255,24 @@ namespace Boombox
             Submit(BoomboxCommandType.SearchOnline, query, 0);
         }
 
+        private void SubmitVolume()
+        {
+            var valueText = volumeInput?.Text?.Trim() ?? string.Empty;
+            if (!TryParseVolume(valueText, out var volume))
+            {
+                ShowTooltip("Enter volume 0..5 or 0..500");
+                return;
+            }
+
+            Submit(BoomboxCommandType.SetVolume, string.Empty, 0, volume);
+        }
+
         private void Submit(BoomboxCommandType type, string text, int number)
+        {
+            Submit(type, text, number, 0f);
+        }
+
+        private void Submit(BoomboxCommandType type, string text, int number, float value)
         {
             var request = new BoomboxCommandRequest
             {
@@ -232,7 +280,7 @@ namespace Boombox
                 Source = BoomboxCommandSource.Ui,
                 Text = text ?? string.Empty,
                 Number = number,
-                Value = 0f,
+                Value = value,
                 BlockPosition = BlockPosition,
                 ClrIdx = ClrIdx
             };
@@ -287,17 +335,30 @@ namespace Boombox
         {
             SetVisible(panelMain, true);
             SetVisible(panelSearch, false);
+            SetVisible(panelVolume, false);
             SetSelected(searchInput, false);
+            SetSelected(volumeInput, false);
         }
 
         private void ShowSearchPanel(bool selectInput = true)
         {
             SetVisible(panelMain, false);
             SetVisible(panelSearch, true);
+            SetVisible(panelVolume, false);
+            SetSelected(volumeInput, false);
             if (selectInput)
             {
                 SetSelected(searchInput, true);
             }
+        }
+
+        private void ShowVolumePanel()
+        {
+            SetVisible(panelMain, false);
+            SetVisible(panelSearch, false);
+            SetVisible(panelVolume, true);
+            SetSelected(searchInput, false);
+            SetSelected(volumeInput, true);
         }
 
         private XUiC_TextInput GetInput(string id)
@@ -333,6 +394,34 @@ namespace Boombox
             TrySetBoolProperty(viewComponent, "Visible", visible);
             TrySetBoolProperty(viewComponent, "IsVisible", visible);
             TryInvokeSetVisible(viewComponent, visible);
+        }
+
+        private static bool TryParseVolume(string value, out float volume)
+        {
+            volume = 1f;
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                return false;
+            }
+
+            var normalized = value.Trim().Replace(',', '.');
+            if (!float.TryParse(normalized, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var parsed))
+            {
+                return false;
+            }
+
+            if (parsed > 5f && parsed <= 500f)
+            {
+                parsed /= 100f;
+            }
+
+            if (parsed < 0f || parsed > 5f)
+            {
+                return false;
+            }
+
+            volume = parsed;
+            return true;
         }
 
         private void RenderRows()

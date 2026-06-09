@@ -7,9 +7,10 @@
         <label depth="1" name="lblTitle" pos="0,260" width="760" height="38" text="Boombox" font_size="32" justify="center" />
 
         <rect depth="1" name="panelMain" pos="0,0" width="760" height="460">
-          <simplebutton name="btnMainSearch" depth="2" pos="250,125" width="260" height="52" font_size="28" caption="Search" />
-          <simplebutton name="btnMainStop" depth="2" pos="250,45" width="260" height="52" font_size="28" caption="Stop" />
-          <simplebutton name="btnMainLocal" depth="2" pos="250,-35" width="260" height="52" font_size="28" caption="Play local" />
+          <simplebutton name="btnMainSearch" depth="2" pos="250,145" width="260" height="52" font_size="28" caption="Search" />
+          <simplebutton name="btnMainStop" depth="2" pos="250,75" width="260" height="52" font_size="28" caption="Stop" />
+          <simplebutton name="btnMainLocal" depth="2" pos="250,5" width="260" height="52" font_size="28" caption="Play local" />
+          <simplebutton name="btnMainVolume" depth="2" pos="250,-65" width="260" height="52" font_size="28" caption="Volume" />
           <simplebutton name="btnMainClose" depth="2" pos="300,-170" width="160" height="40" font_size="22" caption="Close" />
         </rect>
 
@@ -82,6 +83,14 @@
             <simplebutton name="btnResultPlay9" depth="3" pos="540,0" width="72" height="30" font_size="16" caption="Play" />
             <simplebutton name="btnResultNext9" depth="3" pos="620,0" width="88" height="30" font_size="16" caption="Next" />
           </rect>
+        </rect>
+
+        <rect depth="1" name="panelVolume" pos="0,0" width="760" height="460" visible="false">
+          <simplebutton name="btnVolumeBack" depth="2" pos="24,210" width="100" height="36" font_size="20" caption="Back" />
+          <label depth="2" name="lblVolumeTitle" pos="134,213" width="500" height="30" text="Volume" font_size="24" justify="center" />
+
+          <textfield depth="2" name="txtVolume" pos="145,92" width="330" height="42" character_limit="16" focus_on_open="false" clear_on_open="false" open_vk_on_open="false" />
+          <simplebutton name="btnVolumeSet" depth="2" pos="495,92" width="120" height="42" font_size="22" caption="Set" />
         </rect>
       </rect>
     </window>
