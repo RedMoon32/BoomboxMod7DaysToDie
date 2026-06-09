@@ -1207,8 +1207,8 @@ namespace Boombox
 
             var reportClipName = string.IsNullOrEmpty(finishedClipName) ? clipName : finishedClipName;
             var state = new ClientPlaybackState { Token = token };
-            state.Coroutine = gameManager.StartCoroutine(ClientTrackMonitorRoutine(position, clipName, reportClipName, handle, token));
             ClientPlaybackCoroutines[position] = state;
+            state.Coroutine = gameManager.StartCoroutine(ClientTrackMonitorRoutine(position, clipName, reportClipName, handle, token));
             Debug.Log($"[Boombox] Client monitor started pos={position} clip='{clipName}' finishedClip='{reportClipName}' token={token}");
         }
 
@@ -1616,6 +1616,11 @@ namespace Boombox
                 .Setup(position, clipName ?? string.Empty);
 
             connection.SendToServer(package, false);
+            if (connection.IsServer)
+            {
+                ServerHandleTrackFinished(GameManager.Instance?.World, position, null, clipName);
+            }
+
             Debug.Log($"[Boombox] SendTrackFinished sent pos={position} clip='{clipName}'");
         }
 
