@@ -2,27 +2,25 @@
 <configs>
   <append xpath="/blocks">
     <block name="boomboxBlock">
+      <property name="Extends" value="speaker" />
       <property name="Class" value="Boombox.BlockBoombox, Boombox" />
       <property name="IndexName" value="boomboxBlock"/>
-      <property name="CreativeMode" value="Player"/>
-      <property name="CustomIcon" value="boomboxPrefabTest"/>
-      <property name="DescriptionKey" value="boomboxBlockDesc"/>
+      <property name="PlaySound" value="alarm1"/>
+      <property name="RequiredPower" value="5"/>
+      <property name="UnlockedBy" value="craftingElectrician"/>
       <property name="DisplayType" value="blockElectrical"/>
       <property name="Material" value="Mmetal_weak"/>
-      <property name="MaxDamage" value="300"/>
       <property name="Shape" value="ModelEntity"/>
-      <property name="Model" value="#@modfolder:Resources/BoomboxPrefab.unity3d?BoomboxPrefab.prefab"/>
-      <property name="ModelOffset" value="0,0.5,0"/>
-      <property name="Place" value="TowardsPlacer"/>
-      <property name="Path" value="solid"/>
-      <property name="Collide" value="sight,movement,melee,bullet,arrow,rocket"/>
-      <property name="ActivationDistance" value="6"/>
+      <property name="Model" value="@:Entities/Electrical/speakerLoudWallPrefab.prefab"/>
       <property name="ImposterDontBlock" value="true"/>
       <property name="WaterFlow" value="permitted"/>
+      <property name="HandleFace" value="South"/>
+      <property name="Collide" value="movement,melee,bullet,arrow,rocket"/>
       <property name="EconomicValue" value="72"/>
       <property name="SoundPickup" value="speaker_grab"/>
       <property name="SoundPlace" value="speaker_place"/>
-      <property name="TakeDelay" value="1"/>
+      <property name="TraderStageTemplate" value="electricTier1"/><!-- speaker -->
+      <property name="TakeDelay" value="5"/>
       <property class="RepairItems">
         <property name="resourceForgedIron" value="3"/>
         <property name="resourceElectricParts" value="2"/>
@@ -37,6 +35,22 @@
       <property name="Group" value="Science,TCScience"/>
       <property name="Tags" value="electricianSkill"/>
       <property name="FilterTags" value="MC_playerBlocks,SC_electrical"/>
+    </block>
+
+    <block name="boomboxPrefabTestBlock">
+      <property name="Extends" value="decoEntityMetalMaster" param1="CustomIcon,Model,ModelOffset,CreativeMode,Group,FilterTags,DescriptionKey"/>
+      <property name="CreativeMode" value="Player"/>
+      <property name="CustomIcon" value="boomboxPrefabTest"/>
+      <property name="DescriptionKey" value="boomboxPrefabTestBlockDesc"/>
+      <property name="Shape" value="ModelEntity"/>
+      <property name="Model" value="#@modfolder:Resources/BoomboxPrefab.unity3d?BoomboxPrefab.prefab"/>
+      <property name="ModelOffset" value="0,0,0"/>
+      <property name="ImposterDontBlock" value="true"/>
+      <property name="WaterFlow" value="permitted"/>
+      <property name="Collide" value="movement,melee,bullet,arrow,rocket"/>
+      <property name="TakeDelay" value="1"/>
+      <property name="Group" value="Decor/Miscellaneous"/>
+      <property name="FilterTags" value="MC_playerBlocks,SC_decor"/>
     </block>
   </append>
 </configs>
